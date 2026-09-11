@@ -1,0 +1,1008 @@
+package com.example.ui.screens.support
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddLink
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.local.entities.CaseEntity
+import com.example.data.local.entities.SupportFormEntity
+import com.example.ui.components.CyberBadge
+import com.example.ui.theme.CyberBorder
+import com.example.ui.theme.CyberDanger
+import com.example.ui.theme.CyberInfo
+import com.example.ui.theme.CyberPrimary
+import com.example.ui.theme.CyberPrimaryLight
+import com.example.ui.theme.CyberSecondary
+import com.example.ui.theme.CyberSuccess
+import com.example.ui.theme.CyberWarning
+import com.example.ui.theme.TextMuted
+import com.example.ui.viewmodel.ForensicViewModel
+import kotlinx.coroutines.launch
+import java.util.UUID
+
+val SUPPORT_COMPANIES = listOf(
+    "الكل",
+    "Meta",
+    "Instagram",
+    "WhatsApp",
+    "Google",
+    "Apple",
+    "Telegram",
+    "X (Twitter)",
+    "TikTok",
+    "Snapchat",
+    "Discord",
+    "Microsoft"
+)
+
+val SUPPORT_PROBLEM_TYPES = listOf(
+    "الكل",
+    "اختراق",
+    "ابتزاز وتشويه",
+    "انتحال شخصية",
+    "حظر وتجميد",
+    "استعادة وصول",
+    "انتهاك خصوصية",
+    "احتيال مالي",
+    "طلب بيانات قانوني"
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SupportFormsScreen(
+    viewModel: ForensicViewModel,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val forms by viewModel.filteredSupportForms.collectAsStateWithLifecycle()
+    val rawCases by viewModel.rawCases.collectAsStateWithLifecycle()
+
+    val searchQuery by viewModel.supportFormSearchQuery.collectAsStateWithLifecycle()
+    val companyFilter by viewModel.supportFormCompanyFilter.collectAsStateWithLifecycle()
+    val problemFilter by viewModel.supportFormProblemFilter.collectAsStateWithLifecycle()
+    val directOnly by viewModel.supportFormDirectOnly.collectAsStateWithLifecycle()
+    val verifiedOnly by viewModel.supportFormVerifiedOnly.collectAsStateWithLifecycle()
+
+    var selectedFormForCaseLink by remember { mutableStateOf<SupportFormEntity?>(null) }
+    var showAddFormDialog by remember { mutableStateOf(false) }
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showAddFormDialog = true },
+                containerColor = CyberPrimary,
+                contentColor = Color.White,
+                modifier = Modifier.testTag("add_support_form_fab")
+            ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "إضافة نموذج دعم")
+            }
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Header Banner
+            SupportFormsHeader(
+                totalCount = forms.size,
+                verifiedCount = forms.count { it.verified }
+            )
+
+            // Search Box
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { viewModel.supportFormSearchQuery.value = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .testTag("support_form_search_field"),
+                placeholder = {
+                    Text(
+                        "ابحث باسم المنصة، نوع المشكلة (ابتزاز، اختراق، استعادة...) أو الرابط",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "بحث",
+                        tint = CyberPrimaryLight
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { viewModel.supportFormSearchQuery.value = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "مسح",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = CyberPrimary,
+                    unfocusedBorderColor = CyberBorder,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+
+            // Horizontal Filters: Companies
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                SUPPORT_COMPANIES.forEach { company ->
+                    val isSelected = companyFilter == company
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { viewModel.supportFormCompanyFilter.value = company },
+                        label = { Text(company, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = CyberPrimary.copy(alpha = 0.2f),
+                            selectedLabelColor = CyberPrimaryLight,
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) CyberPrimary else CyberBorder
+                        )
+                    )
+                }
+            }
+
+            // Horizontal Filters: Problem Types
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                SUPPORT_PROBLEM_TYPES.forEach { problem ->
+                    val isSelected = problemFilter == problem
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { viewModel.supportFormProblemFilter.value = problem },
+                        label = { Text(problem, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = CyberSecondary.copy(alpha = 0.2f),
+                            selectedLabelColor = CyberSecondary,
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) CyberSecondary else CyberBorder
+                        )
+                    )
+                }
+            }
+
+            // Quick Toggles Row (Direct Forms only, Verified only)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Verified,
+                        contentDescription = null,
+                        tint = CyberSuccess,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text("روابط رسمية ومتحققة فقط", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                }
+                Switch(
+                    checked = verifiedOnly,
+                    onCheckedChange = { viewModel.supportFormVerifiedOnly.value = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = CyberSuccess,
+                        checkedTrackColor = CyberSuccess.copy(alpha = 0.3f)
+                    )
+                )
+            }
+
+            // Forms List
+            if (forms.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = TextMuted,
+                            modifier = Modifier.size(54.dp)
+                        )
+                        Text(
+                            text = "لم يتم العثور على نماذج مطابقة لبحثك",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "جرّب تغيير الفلاتر أو إزالة شروط البحث للعثور على النموذج المطلوب",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(forms, key = { it.id }) { form ->
+                        SupportFormCard(
+                            form = form,
+                            onOpen = { viewModel.openUrl(context, form.formUrl) },
+                            onCopy = { viewModel.copyToClipboard(context, form.formUrl, form.formName) },
+                            onShare = { viewModel.shareUrl(context, form.formUrl, form.formName) },
+                            onLinkToCase = { selectedFormForCaseLink = form }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Link To Case BottomSheet
+        if (selectedFormForCaseLink != null) {
+            LinkSupportFormToCaseSheet(
+                form = selectedFormForCaseLink!!,
+                cases = rawCases,
+                onDismiss = { selectedFormForCaseLink = null },
+                onConfirmLink = { caseId, notes ->
+                    viewModel.linkItemToCase(
+                        caseId = caseId,
+                        itemType = "SUPPORT_FORM",
+                        itemId = selectedFormForCaseLink!!.id,
+                        itemTitle = selectedFormForCaseLink!!.formName,
+                        itemUrl = selectedFormForCaseLink!!.formUrl,
+                        itemPlatformOrCategory = "${selectedFormForCaseLink!!.company} | ${selectedFormForCaseLink!!.problemType}",
+                        notes = notes
+                    )
+                    selectedFormForCaseLink = null
+                }
+            )
+        }
+
+        // Add Custom Form BottomSheet
+        if (showAddFormDialog) {
+            AddSupportFormSheet(
+                onDismiss = { showAddFormDialog = false },
+                onSave = { newForm ->
+                    scope.launch {
+                        viewModel.repository.insertOrUpdateSupportForm(newForm)
+                        viewModel.showHud("تم حفظ نموذج الدعم المباشر بنجاح", com.example.ui.components.HudType.SUCCESS)
+                        showAddFormDialog = false
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SupportFormsHeader(totalCount: Int, verifiedCount: Int) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .border(1.dp, CyberBorder, RoundedCornerShape(14.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = CyberPrimaryLight,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "نماذج الدعم المباشرة الرسمية",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "روابط تقديم البلاغات واستعادة الحسابات مباشرة لدى المنصات العالمية دون وسيط",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(CyberSuccess.copy(alpha = 0.15f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "$totalCount نموذج", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CyberSuccess)
+                    Text(text = "$verifiedCount موثق", fontSize = 9.sp, color = CyberSuccess)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SupportFormCard(
+    form: SupportFormEntity,
+    onOpen: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onLinkToCase: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, CyberBorder, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Top Row: Company Badge & Verification
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(CyberPrimary.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = form.company,
+                            color = CyberPrimaryLight,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(CyberSecondary.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = form.problemType,
+                            color = CyberSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                if (form.verified) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(CyberSuccess.copy(alpha = 0.12f))
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Verified,
+                            contentDescription = "رسمي",
+                            tint = CyberSuccess,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "رابط رسمي مباشر",
+                            color = CyberSuccess,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Form Name
+            Text(
+                text = form.formName,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            // Direct URL
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Link,
+                    contentDescription = null,
+                    tint = CyberPrimaryLight,
+                    modifier = Modifier.size(13.dp)
+                )
+                Text(
+                    text = form.formUrl,
+                    fontSize = 11.sp,
+                    color = CyberPrimaryLight,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Requirements / Guidance
+            if (form.notes.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(CyberWarning.copy(alpha = 0.1f))
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = CyberWarning,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = form.notes,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Buttons Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Primary Action: Open Official URL directly
+                Button(
+                    onClick = onOpen,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .testTag("open_form_button_${form.id}"),
+                    colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OpenInBrowser,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "فتح النموذج الرسمي",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Copy Action
+                IconButton(
+                    onClick = onCopy,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .border(1.dp, CyberBorder, RoundedCornerShape(8.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "نسخ الرابط",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+
+                // Share Action
+                IconButton(
+                    onClick = onShare,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .border(1.dp, CyberBorder, RoundedCornerShape(8.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "مشاركة",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+
+                // Link To Case Action
+                IconButton(
+                    onClick = onLinkToCase,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .border(1.dp, CyberSecondary.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AddLink,
+                        contentDescription = "ربط بقضية",
+                        tint = CyberSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LinkSupportFormToCaseSheet(
+    form: SupportFormEntity,
+    cases: List<CaseEntity>,
+    onDismiss: () -> Unit,
+    onConfirmLink: (caseId: String, notes: String) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedCaseId by remember { mutableStateOf(cases.firstOrNull()?.id ?: "") }
+    var notes by remember { mutableStateOf("") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ربط نموذج الدعم بملف القضية",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "إغلاق")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Form Summary Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CyberBorder, RoundedCornerShape(10.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = form.formName,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${form.company} • ${form.problemType}",
+                        fontSize = 12.sp,
+                        color = CyberPrimaryLight
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = "اختر القضية المراد ربط النموذج بها:",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (cases.isEmpty()) {
+                Text(
+                    text = "لا توجد قضايا نشطة حالياً. يرجى إنشاء قضية أولاً.",
+                    fontSize = 12.sp,
+                    color = CyberWarning
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(cases, key = { it.id }) { c ->
+                        val isSelected = selectedCaseId == c.id
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedCaseId = c.id }
+                                .border(
+                                    1.dp,
+                                    if (isSelected) CyberPrimary else CyberBorder,
+                                    RoundedCornerShape(8.dp)
+                                ),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) CyberPrimary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${c.caseNumber} - ${c.title}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "العميل: ${c.clientName} | الأولوية: ${c.priority}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = CyberPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Notes
+            OutlinedTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("ملاحظات التوثيق (اختياري)") },
+                placeholder = { Text("مثال: تم إرسال البلاغ برقم تذكرة #49281 الساعة 11:30 صباحاً") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                maxLines = 3
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = { onConfirmLink(selectedCaseId, notes) },
+                enabled = selectedCaseId.isNotBlank(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("تأكيد ربط النموذج بالقضية", fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddSupportFormSheet(
+    onDismiss: () -> Unit,
+    onSave: (SupportFormEntity) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var formName by remember { mutableStateOf("") }
+    var company by remember { mutableStateOf("Meta") }
+    var platform by remember { mutableStateOf("Instagram") }
+    var directUrl by remember { mutableStateOf("") }
+    var problemType by remember { mutableStateOf("اختراق") }
+    var requirements by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    var isVerified by remember { mutableStateOf(true) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "إضافة نموذج دعم مباشر جديد",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "إغلاق")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = formName,
+                onValueChange = { formName = it },
+                label = { Text("اسم النموذج / الغرض") },
+                placeholder = { Text("مثال: نموذج الإبلاغ عن ابتزاز إلكتروني مباشر") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = company,
+                    onValueChange = { company = it },
+                    label = { Text("الشركة") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                OutlinedTextField(
+                    value = platform,
+                    onValueChange = { platform = it },
+                    label = { Text("المنصة") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = directUrl,
+                onValueChange = { directUrl = it },
+                label = { Text("الرابط الرسمي المباشر (URL)") },
+                placeholder = { Text("https://help.instagram.com/contact/...") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = problemType,
+                onValueChange = { problemType = it },
+                label = { Text("نوع المشكلة") },
+                placeholder = { Text("اختراق / ابتزاز / حظر...") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = requirements,
+                onValueChange = { requirements = it },
+                label = { Text("المتطلبات قبل التقديم") },
+                placeholder = { Text("مثال: البريد الأصلي المسجل، صورة الهوية الوطنية...") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("ملاحظات إضافية للمسؤول") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("رابط رسمي معتمد ومتحقق منه؟", fontSize = 13.sp)
+                Switch(checked = isVerified, onCheckedChange = { isVerified = it })
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    val parsedDomain = try {
+                        android.net.Uri.parse(directUrl.trim()).host ?: company.trim().lowercase()
+                    } catch (e: Exception) {
+                        company.trim().lowercase()
+                    }
+                    val combinedNotes = if (requirements.isNotBlank()) {
+                        "المتطلبات: ${requirements.trim()}\n${notes.trim()}".trim()
+                    } else {
+                        notes.trim()
+                    }
+                    val newEntity = SupportFormEntity(
+                        id = "form_custom_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(4)}",
+                        formName = formName.trim(),
+                        company = company.trim(),
+                        platform = platform.trim(),
+                        formUrl = directUrl.trim(),
+                        officialDomain = parsedDomain,
+                        problemType = problemType.trim(),
+                        category = "نماذج الدعم المباشرة",
+                        notes = combinedNotes,
+                        verified = isVerified,
+                        urlType = "DIRECT_FORM"
+                    )
+                    onSave(newEntity)
+                },
+                enabled = formName.isNotBlank() && directUrl.isNotBlank(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("حفظ النموذج في المنظومة", fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
