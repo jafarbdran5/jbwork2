@@ -10,17 +10,29 @@ data class CaseEntity(
     val title: String,
     val clientName: String,
     val clientPhone: String,
-    val threatType: String, // Extortion, Impersonation, Blackmail, Account Takeover, Harassment, Doxxing, Phishing, Defamation
-    val priority: String, // Critical, High, Medium, Low
-    val status: String, // New, Investigation, In Progress, Transferred to Police, Resolved, Closed
-    val assignedInvestigator: String,
-    val timelineEventsJson: String, // Serialized list of timeline updates
-    val notes: String,
+    val clientEmail: String = "",
+    val threatType: String, // نوع القضية / المشكلة
+    val description: String = "", // وصف وتفاصيل القضية
+    val priority: String, // حرجة, عالية, متوسطة, منخفضة
+    val status: String, // جديدة, قيد المتابعة, إحالة للجهات المختصة, مكتملة, مغلقة, مؤرشفة
+    val assignedInvestigator: String, // المسؤول عنها
+    val dueDate: String = "", // الموعد النهائي / تاريخ الاستحقاق
+    val source: String = "يدوي", // المصدر: يدوي, Google Sheet, نموذج دعم, طلب خارجي
+    val linkedRequestId: String? = null, // الطلب الخارجي المرتبط
+    val timelineEventsJson: String = "[]", // Serialized list of timeline updates
+    val notes: String = "",
     val createdDate: Long = System.currentTimeMillis(),
     val updatedDate: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
-    val syncStatus: String = "SYNCED" // PENDING_SYNC, SYNCED
+    val isArchived: Boolean = false,
+    val syncStatus: String = "SYNCED", // PENDING_SYNC, SYNCED
+    // Financial & Payments
+    val totalAmount: Double = 0.0, // القيمة الإجمالية للقضية
+    val paidAmount: Double = 0.0, // إجمالي المبالغ المدفوعة
+    val remainingAmount: Double = 0.0, // المبلغ المتبقي
+    val currency: String = "SAR", // العملة
+    val paymentStatus: String = "غير مدفوع" // غير مدفوع, مدفوع جزئيًا, مدفوع بالكامل, معفى, مؤجل
 )
 
 @Entity(tableName = "clients")
@@ -114,6 +126,9 @@ data class TaskEntity(
     val status: String, // جديدة, قيد التنفيذ, مكتملة, مؤجلة
     val relatedCaseId: String? = null,
     val relatedCaseNumber: String? = null,
+    val relatedClientId: String? = null,
+    val relatedContentId: String? = null,
+    val assignedUser: String = "جعفر بدران",
     val createdDate: Long = System.currentTimeMillis(),
     val completedAt: Long? = null,
     val isDeleted: Boolean = false,
@@ -202,6 +217,90 @@ data class CaseLinkedItemEntity(
     val itemPlatformOrCategory: String,
     val linkedAt: Long = System.currentTimeMillis(),
     val notes: String = ""
+)
+
+@Entity(tableName = "case_payments")
+data class CasePaymentEntity(
+    @PrimaryKey val id: String,
+    val caseId: String,
+    val caseNumber: String,
+    val amount: Double,
+    val currency: String = "SAR",
+    val paymentMethod: String, // نقدي, تحويل بنكي, بطاقة مدى/ائتمان, STC Pay, PayPal, شيك, أخرى
+    val paymentDate: String,
+    val notes: String = "",
+    val receiptNumber: String = "",
+    val createdDate: Long = System.currentTimeMillis(),
+    val syncStatus: String = "SYNCED"
+)
+
+@Entity(tableName = "case_financial_logs")
+data class CaseFinancialLogEntity(
+    @PrimaryKey val id: String,
+    val caseId: String,
+    val logType: String, // تحديد السعر, تعديل السعر, تسجيل دفعة, استرداد, إعفاء
+    val oldValue: Double,
+    val newValue: Double,
+    val currency: String = "SAR",
+    val notes: String = "",
+    val performedBy: String = "جعفر بدران",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "case_audit_logs")
+data class CaseAuditLogEntity(
+    @PrimaryKey val id: String,
+    val caseId: String,
+    val caseNumber: String,
+    val operation: String, // إنشاء القضية, تعديل السعر, تغيير الحالة, إضافة دفعة, تعديل بيانات, إضافة مرفق, إغلاق القضية, إعادة فتح, أرشفة
+    val oldValue: String = "",
+    val newValue: String = "",
+    val performedBy: String = "جعفر بدران",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "video_ideas")
+data class VideoIdeaEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val concept: String,
+    val platform: String, // YouTube, TikTok, Instagram, X, LinkedIn, أخرى
+    val contentType: String, // توعية أمنية, شرح تقني, كشف احتيال, نصيحة سريعة, بودكاست, تحليل قضية
+    val targetAudience: String, // عامة المستخدمين, تقنيون, شركات ورواد أعمال, صناع محتوى
+    val goal: String, // زيادة الوعي, بناء الثقة, توجيه المتابعين, جذب عملاء
+    val hook: String = "",
+    val keyPoints: String = "",
+    val status: String = "فكرة جديدة", // فكرة جديدة, قيد التطوير, جاهزة للتصوير, تم التصوير, قيد المونتاج, جاهزة للنشر, تم النشر, مؤرشفة
+    val priority: String = "متوسطة", // حرجة, عالية, متوسطة, منخفضة
+    val notes: String = "",
+    val createdDate: Long = System.currentTimeMillis(),
+    val updatedDate: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false,
+    val deletedAt: Long? = null,
+    val syncStatus: String = "SYNCED"
+)
+
+@Entity(tableName = "video_scripts")
+data class VideoScriptEntity(
+    @PrimaryKey val id: String,
+    val ideaId: String? = null,
+    val title: String,
+    val hook: String = "",
+    val intro: String = "",
+    val mainContent: String = "",
+    val outro: String = "",
+    val callToAction: String = "",
+    val estimatedDuration: String = "60 ثانية",
+    val platform: String = "YouTube",
+    val toneAndStyle: String = "احترافي ومباشر",
+    val referencesAndSources: String = "",
+    val notes: String = "",
+    val status: String = "مسودة", // مسودة, قيد المراجعة, معتمد للتصوير, تم الإنتاج, مؤرشف
+    val createdDate: Long = System.currentTimeMillis(),
+    val updatedDate: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false,
+    val deletedAt: Long? = null,
+    val syncStatus: String = "SYNCED"
 )
 
 

@@ -5,23 +5,28 @@ import com.example.data.local.PrepopulatedKnowledge
 import com.example.data.local.PrepopulatedSupportForms
 import com.example.data.local.PrepopulatedInvestigationTools
 import com.example.data.local.entities.AuditLogEntity
+import com.example.data.local.entities.CaseAuditLogEntity
 import com.example.data.local.entities.CaseEntity
+import com.example.data.local.entities.CaseFinancialLogEntity
 import com.example.data.local.entities.CaseLinkedItemEntity
+import com.example.data.local.entities.CasePaymentEntity
 import com.example.data.local.entities.ClientEntity
 import com.example.data.local.entities.ContentEntity
 import com.example.data.local.entities.EvidenceEntity
 import com.example.data.local.entities.InvestigationToolEntity
 import com.example.data.local.entities.KnowledgeEntity
 import com.example.data.local.entities.SupportFormEntity
-import com.example.data.local.entities.TaskEntity
 import com.example.data.local.entities.SyncOperationEntity
-import com.example.data.local.entities.AppSettingsEntity
+import com.example.data.local.entities.TaskEntity
+import com.example.data.local.entities.VideoIdeaEntity
+import com.example.data.local.entities.VideoScriptEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 class ForensicRepository(
@@ -40,6 +45,11 @@ class ForensicRepository(
     private val supportFormDao = database.supportFormDao()
     private val investigationToolDao = database.investigationToolDao()
     private val caseLinkedItemDao = database.caseLinkedItemDao()
+    private val casePaymentDao = database.casePaymentDao()
+    private val caseFinancialLogDao = database.caseFinancialLogDao()
+    private val caseAuditLogDao = database.caseAuditLogDao()
+    private val videoIdeaDao = database.videoIdeaDao()
+    private val videoScriptDao = database.videoScriptDao()
 
     // Sync status state for UI feedback
     private val _isCloudSyncing = MutableStateFlow(false)
@@ -60,6 +70,10 @@ class ForensicRepository(
     val allSettings: Flow<List<com.example.data.local.entities.AppSettingsEntity>> = settingsDao.getAllSettings()
     val allSupportForms: Flow<List<SupportFormEntity>> = supportFormDao.getAllActiveForms()
     val allInvestigationTools: Flow<List<InvestigationToolEntity>> = investigationToolDao.getAllActiveTools()
+    val allPayments: Flow<List<CasePaymentEntity>> = casePaymentDao.getAllPayments()
+    val allFinancialLogs: Flow<List<CaseFinancialLogEntity>> = caseFinancialLogDao.getAllFinancialLogs()
+    val allVideoIdeas: Flow<List<VideoIdeaEntity>> = videoIdeaDao.getAllActiveIdeas()
+    val allVideoScripts: Flow<List<VideoScriptEntity>> = videoScriptDao.getAllActiveScripts()
 
     // Trash & Deleted Items Flows
     val deletedCases: Flow<List<CaseEntity>> = caseDao.getDeletedCases()
@@ -68,6 +82,7 @@ class ForensicRepository(
     val deletedContent: Flow<List<ContentEntity>> = contentDao.getDeletedContent()
     val deletedKnowledge: Flow<List<KnowledgeEntity>> = knowledgeDao.getDeletedKnowledge()
     val deletedTasks: Flow<List<TaskEntity>> = taskDao.getDeletedTasks()
+    val deletedVideoIdeas: Flow<List<VideoIdeaEntity>> = videoIdeaDao.getDeletedIdeas()
 
     init {
         // Ensure official guides and seed data exist
@@ -487,6 +502,338 @@ class ForensicRepository(
     suspend fun unlinkItemByCaseAndItem(caseId: String, itemId: String) {
         caseLinkedItemDao.deleteByCaseAndItem(caseId, itemId)
     }
+
+    // ==========================================
+    // PAYMENTS & FINANCIAL MANAGEMENT
+    // ==========================================
+    fun getPaymentsForCase(caseId: String): Flow<List<CasePaymentEntity>> =
+        casePaymentDao.getPaymentsForCase(caseId)
+
+    fun getCaseAuditLogs(caseId: String): Flow<List<CaseAuditLogEntity>> =
+        caseAuditLogDao.getLogsForCase(caseId)
+
+    fun getCaseFinancialLogs(caseId: String): Flow<List<CaseFinancialLogEntity>> =
+        caseFinancialLogDao.getLogsForCase(caseId)
+
+    suspend fun addCasePayment(
+        caseId: String,
+        amount: Double,
+        paymentMethod: String,
+        paymentDate: String,
+        notes: String,
+        receiptNumber: String = "",
+        performedBy: String = "جعفر بدران"
+    ): Result<CasePaymentEntity> = withContext(Dispatchers.IO) {
+        try {
+            val case = caseDao.getCaseById(caseId)
+                ?: return@withContext Result.failure(Exception("القضية غير موجودة"))
+
+            val paymentId = "pay_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}"
+            val payment = CasePaymentEntity(
+                id = paymentId,
+                caseId = caseId,
+                caseNumber = case.caseNumber,
+                amount = amount,
+                currency = case.currency,
+                paymentMethod = paymentMethod,
+                paymentDate = paymentDate.ifBlank {
+                    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                },
+                notes = notes,
+                receiptNumber = receiptNumber,
+                createdDate = System.currentTimeMillis()
+            )
+            casePaymentDao.insert(payment)
+
+            val currentTotalPaid = (casePaymentDao.getTotalPaidForCase(caseId) ?: 0.0)
+            val newRemaining = (case.totalAmount - currentTotalPaid).coerceAtLeast(0.0)
+            val newStatus = when {
+                case.totalAmount <= 0.0 -> "معفى"
+                newRemaining <= 0.0 -> "مدفوع بالكامل"
+                currentTotalPaid > 0.0 -> "مدفوع جزئيًا"
+                else -> "غير مدفوع"
+            }
+
+            val updatedCase = case.copy(
+                paidAmount = currentTotalPaid,
+                remainingAmount = newRemaining,
+                paymentStatus = newStatus,
+                updatedDate = System.currentTimeMillis()
+            )
+            caseDao.update(updatedCase)
+
+            caseFinancialLogDao.insert(
+                CaseFinancialLogEntity(
+                    id = "fin_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+                    caseId = caseId,
+                    logType = "تسجيل دفعة",
+                    oldValue = case.paidAmount,
+                    newValue = currentTotalPaid,
+                    currency = case.currency,
+                    notes = "دفعة بقيمة $amount عبر $paymentMethod. $notes",
+                    performedBy = performedBy
+                )
+            )
+
+            caseAuditLogDao.insert(
+                CaseAuditLogEntity(
+                    id = "caud_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+                    caseId = caseId,
+                    caseNumber = case.caseNumber,
+                    operation = "إضافة دفعة مالية",
+                    oldValue = "${case.paidAmount} ${case.currency}",
+                    newValue = "$currentTotalPaid ${case.currency} (المتبقي: $newRemaining)",
+                    performedBy = performedBy
+                )
+            )
+
+            logAudit(
+                actionType = "PAYMENT",
+                module = "CASES",
+                entityId = caseId,
+                performedBy = performedBy,
+                details = "تسجيل دفعة مالية بقيمة $amount ${case.currency} للقضية ${case.caseNumber}"
+            )
+            dispatchCloudSync("cases", caseId)
+
+            Result.success(payment)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateCasePrice(
+        caseId: String,
+        newPrice: Double,
+        notes: String,
+        performedBy: String = "جعفر بدران"
+    ): Result<CaseEntity> = withContext(Dispatchers.IO) {
+        try {
+            val case = caseDao.getCaseById(caseId)
+                ?: return@withContext Result.failure(Exception("القضية غير موجودة"))
+
+            val oldPrice = case.totalAmount
+            val totalPaid = case.paidAmount
+            val newRemaining = (newPrice - totalPaid).coerceAtLeast(0.0)
+            val newStatus = when {
+                newPrice <= 0.0 -> "معفى"
+                newRemaining <= 0.0 -> "مدفوع بالكامل"
+                totalPaid > 0.0 -> "مدفوع جزئيًا"
+                else -> "غير مدفوع"
+            }
+
+            val updatedCase = case.copy(
+                totalAmount = newPrice,
+                remainingAmount = newRemaining,
+                paymentStatus = newStatus,
+                updatedDate = System.currentTimeMillis()
+            )
+            caseDao.update(updatedCase)
+
+            caseFinancialLogDao.insert(
+                CaseFinancialLogEntity(
+                    id = "fin_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+                    caseId = caseId,
+                    logType = "تعديل السعر",
+                    oldValue = oldPrice,
+                    newValue = newPrice,
+                    currency = case.currency,
+                    notes = notes.ifBlank { "تعديل القيمة الإجمالية للقضية" },
+                    performedBy = performedBy
+                )
+            )
+
+            caseAuditLogDao.insert(
+                CaseAuditLogEntity(
+                    id = "caud_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+                    caseId = caseId,
+                    caseNumber = case.caseNumber,
+                    operation = "تعديل السعر",
+                    oldValue = "$oldPrice ${case.currency}",
+                    newValue = "$newPrice ${case.currency} (المتبقي: $newRemaining)",
+                    performedBy = performedBy
+                )
+            )
+
+            logAudit(
+                actionType = "PRICE_UPDATE",
+                module = "CASES",
+                entityId = caseId,
+                performedBy = performedBy,
+                details = "تعديل سعر القضية ${case.caseNumber} من $oldPrice إلى $newPrice ${case.currency}"
+            )
+            dispatchCloudSync("cases", caseId)
+
+            Result.success(updatedCase)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun changeCaseStatus(
+        caseId: String,
+        newStatus: String,
+        performedBy: String = "جعفر بدران"
+    ) = withContext(Dispatchers.IO) {
+        val case = caseDao.getCaseById(caseId) ?: return@withContext
+        val oldStatus = case.status
+        val updated = case.copy(
+            status = newStatus,
+            isArchived = if (newStatus == "مؤرشفة") true else case.isArchived,
+            updatedDate = System.currentTimeMillis()
+        )
+        caseDao.update(updated)
+        caseAuditLogDao.insert(
+            CaseAuditLogEntity(
+                id = "caud_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+                caseId = caseId,
+                caseNumber = case.caseNumber,
+                operation = "تغيير الحالة",
+                oldValue = oldStatus,
+                newValue = newStatus,
+                performedBy = performedBy
+            )
+        )
+        logAudit("STATUS_CHANGE", "CASES", caseId, performedBy, "Super Admin", "تغيير حالة القضية ${case.caseNumber} إلى $newStatus")
+        dispatchCloudSync("cases", caseId)
+    }
+
+    suspend fun changeCasePriority(
+        caseId: String,
+        newPriority: String,
+        performedBy: String = "جعفر بدران"
+    ) = withContext(Dispatchers.IO) {
+        val case = caseDao.getCaseById(caseId) ?: return@withContext
+        val oldPriority = case.priority
+        val updated = case.copy(
+            priority = newPriority,
+            updatedDate = System.currentTimeMillis()
+        )
+        caseDao.update(updated)
+        caseAuditLogDao.insert(
+            CaseAuditLogEntity(
+                id = "caud_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+                caseId = caseId,
+                caseNumber = case.caseNumber,
+                operation = "تعديل الأولوية",
+                oldValue = oldPriority,
+                newValue = newPriority,
+                performedBy = performedBy
+            )
+        )
+        logAudit("PRIORITY_CHANGE", "CASES", caseId, performedBy, "Super Admin", "تعديل أولوية القضية ${case.caseNumber} إلى $newPriority")
+        dispatchCloudSync("cases", caseId)
+    }
+
+    suspend fun closeCase(caseId: String, reason: String = "", performedBy: String = "جعفر بدران") {
+        changeCaseStatus(caseId, "مغلقة", performedBy)
+    }
+
+    suspend fun reopenCase(caseId: String, performedBy: String = "جعفر بدران") {
+        changeCaseStatus(caseId, "قيد المتابعة", performedBy)
+    }
+
+    suspend fun archiveCase(caseId: String, performedBy: String = "جعفر بدران") {
+        changeCaseStatus(caseId, "مؤرشفة", performedBy)
+    }
+
+    suspend fun duplicateCase(
+        sourceCaseId: String,
+        performedBy: String = "جعفر بدران"
+    ): Result<CaseEntity> = withContext(Dispatchers.IO) {
+        try {
+            val original = caseDao.getCaseById(sourceCaseId)
+                ?: return@withContext Result.failure(Exception("القضية الأصلية غير موجودة"))
+            val newNumber = "JB-${java.text.SimpleDateFormat("yyyy-MMdd", java.util.Locale.US).format(java.util.Date())}-${(100..999).random()}"
+            val newCaseId = "case_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}"
+            val cloned = original.copy(
+                id = newCaseId,
+                caseNumber = newNumber,
+                title = "نسخة من: ${original.title}",
+                status = "جديدة",
+                createdDate = System.currentTimeMillis(),
+                updatedDate = System.currentTimeMillis(),
+                paidAmount = 0.0,
+                remainingAmount = original.totalAmount,
+                paymentStatus = if (original.totalAmount > 0) "غير مدفوع" else "معفى",
+                isArchived = false,
+                isDeleted = false,
+                deletedAt = null
+            )
+            caseDao.insertOrUpdate(cloned)
+            caseAuditLogDao.insert(
+                CaseAuditLogEntity(
+                    id = "caud_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+                    caseId = newCaseId,
+                    caseNumber = newNumber,
+                    operation = "استنساخ القضية",
+                    oldValue = "الأصل: ${original.caseNumber}",
+                    newValue = "نسخة جديدة: $newNumber",
+                    performedBy = performedBy
+                )
+            )
+            logAudit("CLONE", "CASES", newCaseId, performedBy, "Super Admin", "استنساخ القضية ${original.caseNumber} لإنشاء $newNumber")
+            dispatchCloudSync("cases", newCaseId)
+            Result.success(cloned)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ==========================================
+    // VIDEO IDEAS & SCRIPTS CRUD & SYNC
+    // ==========================================
+    suspend fun insertOrUpdateVideoIdea(idea: VideoIdeaEntity, isNew: Boolean = false) = withContext(Dispatchers.IO) {
+        videoIdeaDao.insertOrUpdate(idea)
+        logAudit(
+            actionType = if (isNew) "CREATE" else "EDIT",
+            module = "STUDIO",
+            entityId = idea.id,
+            details = "${if (isNew) "إضافة فكرة فيديو جديدة" else "تعديل فكرة فيديو"}: ${idea.title}"
+        )
+        dispatchCloudSync("video_ideas", idea.id)
+    }
+
+    suspend fun softDeleteVideoIdea(id: String, title: String) = withContext(Dispatchers.IO) {
+        videoIdeaDao.softDelete(id)
+        logAudit(
+            actionType = "DELETE",
+            module = "STUDIO",
+            entityId = id,
+            details = "حذف فكرة الفيديو: $title"
+        )
+        dispatchCloudSync("video_ideas", id)
+    }
+
+    suspend fun restoreVideoIdea(id: String) = withContext(Dispatchers.IO) {
+        videoIdeaDao.restore(id)
+        logAudit(actionType = "RESTORE", module = "STUDIO", entityId = id, details = "استعادة فكرة الفيديو $id")
+    }
+
+    suspend fun insertOrUpdateVideoScript(script: VideoScriptEntity, isNew: Boolean = false) = withContext(Dispatchers.IO) {
+        videoScriptDao.insertOrUpdate(script)
+        logAudit(
+            actionType = if (isNew) "CREATE" else "EDIT",
+            module = "STUDIO",
+            entityId = script.id,
+            details = "${if (isNew) "إنشاء سكربت فيديو جديد" else "تحديث سكربت فيديو"}: ${script.title}"
+        )
+        dispatchCloudSync("video_scripts", script.id)
+    }
+
+    suspend fun softDeleteVideoScript(id: String, title: String) = withContext(Dispatchers.IO) {
+        videoScriptDao.softDelete(id)
+        logAudit(
+            actionType = "DELETE",
+            module = "STUDIO",
+            entityId = id,
+            details = "حذف سكربت الفيديو: $title"
+        )
+        dispatchCloudSync("video_scripts", id)
+    }
+
+    fun getScriptsForIdea(ideaId: String): Flow<List<VideoScriptEntity>> =
+        videoScriptDao.getScriptsForIdea(ideaId)
 
     // ==========================================
     // CLOUD SYNC DISPATCHER (OFFLINE-FIRST)

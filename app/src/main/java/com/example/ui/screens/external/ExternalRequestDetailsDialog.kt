@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.local.entities.ExternalRequestEntity
 import com.example.ui.viewmodel.ForensicViewModel
 import org.json.JSONObject
@@ -105,13 +106,17 @@ fun ExternalRequestDetailsDialog(
         map
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp)
+                .fillMaxWidth(0.95f)
+                .heightIn(max = 680.dp)
+                .padding(vertical = 12.dp)
         ) {
             Column(
                 modifier = Modifier

@@ -24,20 +24,39 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,21 +68,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entities.CaseEntity
+import com.example.data.local.entities.CasePaymentEntity
 import com.example.data.local.entities.EvidenceEntity
+import com.example.ui.components.CyberBadge
+import com.example.ui.components.CyberCard
 import com.example.ui.components.HudType
 import com.example.ui.theme.CyberBorder
 import com.example.ui.theme.CyberCard
 import com.example.ui.theme.CyberCardElevated
+import com.example.ui.theme.CyberDanger
 import com.example.ui.theme.CyberInfo
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberPrimaryLight
 import com.example.ui.theme.CyberSecondary
 import com.example.ui.theme.CyberSuccess
+import com.example.ui.theme.CyberWarning
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -74,6 +101,52 @@ import java.util.Locale
 
 @Composable
 fun ReportsScreen(viewModel: ForensicViewModel) {
+    var activeMainTab by remember { mutableStateOf(0) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TabRow(
+            selectedTabIndex = activeMainTab,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = CyberPrimary,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    modifier = Modifier.tabIndicatorOffset(tabPositions[activeMainTab]),
+                    color = CyberPrimary
+                )
+            }
+        ) {
+            Tab(
+                selected = activeMainTab == 0,
+                onClick = { activeMainTab = 0 },
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text("تقارير العمل المعتمدة", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            )
+            Tab(
+                selected = activeMainTab == 1,
+                onClick = { activeMainTab = 1 },
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text("لوحة الأرباح والمالية", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            )
+        }
+
+        if (activeMainTab == 0) {
+            CertifiedReportsView(viewModel = viewModel)
+        } else {
+            EarningsAndFinanceDashboard(viewModel = viewModel)
+        }
+    }
+}
+
+@Composable
+private fun CertifiedReportsView(viewModel: ForensicViewModel) {
     val cases by viewModel.rawCases.collectAsState()
     val evidenceList by viewModel.rawEvidence.collectAsState()
     val context = LocalContext.current
@@ -156,8 +229,8 @@ fun ReportsScreen(viewModel: ForensicViewModel) {
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(if (isSelected) CyberSecondary else MaterialTheme.colorScheme.surfaceVariant)
                                 .border(1.dp, if (isSelected) CyberSecondary else CyberBorder, RoundedCornerShape(10.dp))
-                            .clickable { selectedCaseId = c.id }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                                .clickable { selectedCaseId = c.id }
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
                         ) {
                             Text(
                                 text = "${c.caseNumber} - ${c.clientName}",
@@ -276,6 +349,529 @@ fun ReportsScreen(viewModel: ForensicViewModel) {
             }
         }
     }
+}
+
+@Composable
+private fun EarningsAndFinanceDashboard(viewModel: ForensicViewModel) {
+    val cases by viewModel.rawCases.collectAsState()
+    val rawPayments by viewModel.rawPayments.collectAsState()
+    val searchQuery by viewModel.paymentSearchQuery.collectAsState()
+    val methodFilter by viewModel.paymentMethodFilter.collectAsState()
+    val filteredPayments by viewModel.filteredPayments.collectAsState()
+    val context = LocalContext.current
+
+    var showAddPaymentDialog by remember { mutableStateOf(false) }
+
+    // Financial Metrics
+    val totalContractAmount = cases.sumOf { it.totalAmount }
+    val totalCollected = rawPayments.sumOf { it.amount }
+    val totalRemaining = (totalContractAmount - totalCollected).coerceAtLeast(0.0)
+    val collectionRate = if (totalContractAmount > 0) ((totalCollected / totalContractAmount) * 100).toInt() else 100
+
+    val paymentMethods = listOf("الكل", "تحويل بنكي", "بطاقة مدى/ائتمان", "STC Pay", "نقدي", "PayPal", "أخرى")
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Header & Actions
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "لوحة متابعة الأرباح والمالية",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "إدارة عوائد القضايا والدفعات وإصدار وصولات السداد الرسمية",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                }
+                Button(
+                    onClick = { showAddPaymentDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.testTag("add_payment_button")
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("تسجيل دفعة", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Summary KPI Cards Grid
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Total Collected Card
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("إجمالي المحصل", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = CyberSuccess, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "%,.2f SAR".format(totalCollected),
+                                color = CyberSuccess,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "نسبة التحصيل: $collectionRate%",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    // Total Contracted Card
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("إجمالي التعاقدات", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Icon(Icons.Default.AttachMoney, contentDescription = null, tint = CyberPrimary, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "%,.2f SAR".format(totalContractAmount),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "${cases.size} قضية مسجلة",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Remaining Uncollected Card
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("المتبقي للتحصيل", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = CyberWarning, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "%,.2f SAR".format(totalRemaining),
+                                color = if (totalRemaining > 0) CyberWarning else CyberSuccess,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (totalRemaining > 0) "مستحقات معلقة" else "لا توجد متأخرات",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    // Total Payments Count Card
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("عمليات السداد", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Icon(Icons.Default.Receipt, contentDescription = null, tint = CyberSecondary, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "${rawPayments.size} دفعة",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "سجل الإيصالات المالية",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Export Financial Statement Action
+        item {
+            OutlinedButton(
+                onClick = {
+                    val summaryText = buildString {
+                        appendLine("======================================================")
+                        appendLine("             كشف المتابعة المالية والأرباح")
+                        appendLine("      JAFFAR BADRAN FORENSIC & FINANCIAL AUDIT")
+                        appendLine("======================================================")
+                        appendLine("تاريخ التقرير: ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())}")
+                        appendLine("إجمالي قيمة القضايا: %,.2f SAR".format(totalContractAmount))
+                        appendLine("إجمالي المبالغ المحصلة: %,.2f SAR".format(totalCollected))
+                        appendLine("المبالغ المتبقية للتحصيل: %,.2f SAR".format(totalRemaining))
+                        appendLine("نسبة التحصيل: $collectionRate%")
+                        appendLine("عدد الدفعات المسجلة: ${rawPayments.size}")
+                        appendLine("------------------------------------------------------")
+                        appendLine("سجل آخر الدفعات:")
+                        if (rawPayments.isEmpty()) {
+                            appendLine("لا توجد دفعات مسجلة بعد.")
+                        } else {
+                            rawPayments.take(15).forEach { p ->
+                                appendLine("• رقم الإيصال: ${p.receiptNumber.ifBlank { "غير مسجل" }} | التاريخ: ${p.paymentDate}")
+                                appendLine("  القضية: ${p.caseNumber} | المبلغ: %,.2f ${p.currency} | الطريقة: ${p.paymentMethod}".format(p.amount))
+                                if (p.notes.isNotBlank()) appendLine("  ملاحظات: ${p.notes}")
+                            }
+                        }
+                        appendLine("======================================================")
+                        appendLine("            الاعتماد والتدقيق: جعفر بدران")
+                        appendLine("======================================================")
+                    }
+
+                    val sendIntent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, summaryText)
+                        type = "text/plain"
+                    }
+                    context.startActivity(Intent.createChooser(sendIntent, "مشاركة كشف الحساب المالي"))
+                    viewModel.showHud("تم فتح نافذة مشاركة الكشف المالي", HudType.INFO)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberPrimaryLight)
+            ) {
+                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("مشاركة وتصدير كشف الحساب المالي الشامل", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // Filter Bar & Search
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.paymentSearchQuery.value = it },
+                    placeholder = { Text("بحث برقم القضية، رقم الإيصال، أو الملاحظات...", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CyberPrimary,
+                        unfocusedBorderColor = CyberBorder
+                    ),
+                    singleLine = true
+                )
+
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(paymentMethods) { method ->
+                        val isSelected = methodFilter == method
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { viewModel.paymentMethodFilter.value = method },
+                            label = { Text(method, fontSize = 11.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = CyberPrimary.copy(alpha = 0.2f),
+                                selectedLabelColor = CyberPrimaryLight
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section Title
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "سجل الإيصالات والمعاملات (${filteredPayments.size})",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Payment Items
+        if (filteredPayments.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CyberBorder, RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.Receipt, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(40.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("لا توجد دفعات مالية مسجلة حالياً", color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("اضغط على «تسجيل دفعة» لإضافة سداد مالي لإحدى القضايا", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                }
+            }
+        } else {
+            items(filteredPayments) { payment ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CyberBorder, RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = payment.caseNumber,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    if (payment.receiptNumber.isNotBlank()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(CyberSecondary.copy(alpha = 0.15f))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "إيصال: ${payment.receiptNumber}",
+                                                color = CyberSecondary,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = payment.paymentDate,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "%,.2f ${payment.currency}".format(payment.amount),
+                                    color = CyberSuccess,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = payment.paymentMethod,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        if (payment.notes.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = payment.notes,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddPaymentDialog) {
+        AddPaymentDialog(
+            cases = cases,
+            onDismiss = { showAddPaymentDialog = false },
+            onConfirm = { caseId, amount, method, date, notes, receiptNumber ->
+                viewModel.addCasePayment(
+                    caseId = caseId,
+                    amount = amount,
+                    paymentMethod = method,
+                    paymentDate = date,
+                    notes = notes,
+                    receiptNumber = receiptNumber
+                )
+                showAddPaymentDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun AddPaymentDialog(
+    cases: List<CaseEntity>,
+    onDismiss: () -> Unit,
+    onConfirm: (caseId: String, amount: Double, method: String, date: String, notes: String, receiptNumber: String) -> Unit
+) {
+    var selectedCaseId by remember { mutableStateOf(cases.firstOrNull()?.id ?: "") }
+    var amountText by remember { mutableStateOf("") }
+    var selectedMethod by remember { mutableStateOf("تحويل بنكي") }
+    var receiptNumber by remember { mutableStateOf("REC-${System.currentTimeMillis().toString().takeLast(6)}") }
+    var notes by remember { mutableStateOf("") }
+    val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+    val methods = listOf("تحويل بنكي", "بطاقة مدى/ائتمان", "STC Pay", "نقدي", "PayPal", "أخرى")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تسجيل دفعة مالية جديدة", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item {
+                    Text("اختر القضية المعنية:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(cases) { c ->
+                            val isSelected = selectedCaseId == c.id
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { selectedCaseId = c.id },
+                                label = { Text("${c.caseNumber} - ${c.clientName}", fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { amountText = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                        label = { Text("المبلغ (SAR)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+
+                item {
+                    Text("طريقة السداد:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(methods) { method ->
+                            FilterChip(
+                                selected = selectedMethod == method,
+                                onClick = { selectedMethod = method },
+                                label = { Text(method, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = receiptNumber,
+                        onValueChange = { receiptNumber = it },
+                        label = { Text("رقم الإيصال أو المرجع") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text("ملاحظات السداد (اختياري)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amount = amountText.toDoubleOrNull() ?: 0.0
+                    if (selectedCaseId.isNotBlank() && amount > 0) {
+                        onConfirm(selectedCaseId, amount, selectedMethod, currentDate, notes, receiptNumber)
+                    }
+                },
+                enabled = selectedCaseId.isNotBlank() && (amountText.toDoubleOrNull() ?: 0.0) > 0,
+                colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary)
+            ) {
+                Text("تأكيد وحفظ")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("إلغاء")
+            }
+        }
+    )
 }
 
 private fun generateReportText(

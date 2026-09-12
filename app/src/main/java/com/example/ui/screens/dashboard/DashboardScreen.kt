@@ -647,9 +647,9 @@ fun StatCard(
     onClick: () -> Unit
 ) {
     Card(
+        onClick = onClick,
         modifier = modifier
-            .border(1.dp, CyberBorder, RoundedCornerShape(14.dp))
-            .clickable { onClick() },
+            .border(1.dp, CyberBorder, RoundedCornerShape(14.dp)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(14.dp)
     ) {
@@ -701,10 +701,10 @@ fun QuickActionButton(
     onClick: () -> Unit
 ) {
     Card(
+        onClick = onClick,
         modifier = Modifier
             .width(105.dp)
-            .border(1.dp, CyberBorder, RoundedCornerShape(14.dp))
-            .clickable { onClick() },
+            .border(1.dp, CyberBorder, RoundedCornerShape(14.dp)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(14.dp)
     ) {
@@ -746,10 +746,10 @@ fun DashboardCaseCard(
     onClick: () -> Unit
 ) {
     Card(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, CyberBorder, RoundedCornerShape(12.dp))
-            .clickable { onClick() },
+            .border(1.dp, CyberBorder, RoundedCornerShape(12.dp)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(12.dp)
     ) {
@@ -827,6 +827,7 @@ fun DashboardTaskRow(
     onToggle: () -> Unit
 ) {
     Card(
+        onClick = onToggle,
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, CyberBorder, RoundedCornerShape(12.dp)),

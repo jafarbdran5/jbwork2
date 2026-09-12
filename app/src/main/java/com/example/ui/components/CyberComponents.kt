@@ -3,6 +3,7 @@ package com.example.ui.components
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -64,17 +65,17 @@ fun CyberCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    Box(
+    Surface(
+        onClick = onClick ?: {},
+        enabled = onClick != null,
+        shape = RoundedCornerShape(14.dp),
+        color = backgroundColor,
+        border = BorderStroke(1.dp, borderColor),
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(backgroundColor)
-            .border(1.dp, borderColor, RoundedCornerShape(14.dp))
-            .then(
-                if (onClick != null) Modifier.clickable { onClick() } else Modifier
-            )
-            .padding(14.dp)
     ) {
-        content()
+        Box(modifier = Modifier.padding(14.dp)) {
+            content()
+        }
     }
 }
 

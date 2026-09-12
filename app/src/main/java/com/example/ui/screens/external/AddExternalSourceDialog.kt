@@ -179,9 +179,12 @@ fun AddExternalSourceDialog(
                         if (publicUrl.isNotBlank()) {
                             isTesting = true
                             testStatus = null
-                            viewModel.testExternalSourceConnection(publicUrl) { success, msg ->
+                            viewModel.testExternalSourceConnection(publicUrl) { success, msg, detectedTitle ->
                                 isTesting = false
                                 testStatus = Pair(success, msg)
+                                if (success && sourceName.isBlank() && detectedTitle.isNotBlank()) {
+                                    sourceName = detectedTitle
+                                }
                             }
                         }
                     },

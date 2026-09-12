@@ -7,8 +7,11 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.local.dao.AuditLogDao
+import com.example.data.local.dao.CaseAuditLogDao
 import com.example.data.local.dao.CaseDao
+import com.example.data.local.dao.CaseFinancialLogDao
 import com.example.data.local.dao.CaseLinkedItemDao
+import com.example.data.local.dao.CasePaymentDao
 import com.example.data.local.dao.ClientDao
 import com.example.data.local.dao.ContentDao
 import com.example.data.local.dao.EvidenceDao
@@ -21,10 +24,15 @@ import com.example.data.local.dao.SettingsDao
 import com.example.data.local.dao.SupportFormDao
 import com.example.data.local.dao.SyncOperationDao
 import com.example.data.local.dao.TaskDao
+import com.example.data.local.dao.VideoIdeaDao
+import com.example.data.local.dao.VideoScriptDao
 import com.example.data.local.entities.AppSettingsEntity
 import com.example.data.local.entities.AuditLogEntity
+import com.example.data.local.entities.CaseAuditLogEntity
 import com.example.data.local.entities.CaseEntity
+import com.example.data.local.entities.CaseFinancialLogEntity
 import com.example.data.local.entities.CaseLinkedItemEntity
+import com.example.data.local.entities.CasePaymentEntity
 import com.example.data.local.entities.ClientEntity
 import com.example.data.local.entities.ContentEntity
 import com.example.data.local.entities.EvidenceEntity
@@ -36,6 +44,8 @@ import com.example.data.local.entities.KnowledgeEntity
 import com.example.data.local.entities.SupportFormEntity
 import com.example.data.local.entities.SyncOperationEntity
 import com.example.data.local.entities.TaskEntity
+import com.example.data.local.entities.VideoIdeaEntity
+import com.example.data.local.entities.VideoScriptEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -56,9 +66,14 @@ import kotlinx.coroutines.launch
         CaseLinkedItemEntity::class,
         ExternalRequestSourceEntity::class,
         ExternalSheetEntity::class,
-        ExternalRequestEntity::class
+        ExternalRequestEntity::class,
+        CasePaymentEntity::class,
+        CaseFinancialLogEntity::class,
+        CaseAuditLogEntity::class,
+        VideoIdeaEntity::class,
+        VideoScriptEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -78,6 +93,11 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun externalRequestSourceDao(): ExternalRequestSourceDao
     abstract fun externalSheetDao(): ExternalSheetDao
     abstract fun externalRequestDao(): ExternalRequestDao
+    abstract fun casePaymentDao(): CasePaymentDao
+    abstract fun caseFinancialLogDao(): CaseFinancialLogDao
+    abstract fun caseAuditLogDao(): CaseAuditLogDao
+    abstract fun videoIdeaDao(): VideoIdeaDao
+    abstract fun videoScriptDao(): VideoScriptDao
 
     companion object {
         @Volatile

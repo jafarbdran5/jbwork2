@@ -27,27 +27,38 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.LockClock
 import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SupervisorAccount
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +69,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -106,6 +121,13 @@ fun AuditAndSecurityScreen(
     val currentLang by viewModel.currentLanguage.collectAsStateWithLifecycle()
     val isCloudSyncing by viewModel.isCloudSyncing.collectAsStateWithLifecycle()
     val lastSync by viewModel.lastSyncTimestamp.collectAsStateWithLifecycle()
+
+    val isLockEnabled by viewModel.isLockEnabled.collectAsStateWithLifecycle()
+    val appPin by viewModel.appPin.collectAsStateWithLifecycle()
+    val autoLockInterval by viewModel.autoLockInterval.collectAsStateWithLifecycle()
+    val isBiometricHardwareEnabled by viewModel.isBiometricHardwareEnabled.collectAsStateWithLifecycle()
+
+    var showChangePinDialog by remember { mutableStateOf(false) }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("مركز التحكم والأمان", "سجل التدقيق الأمني (Audit Log)", "أرقام الطوارئ والمصادر")
@@ -205,49 +227,152 @@ fun AuditAndSecurityScreen(
                         }
                     }
 
-                    // Biometric App Lock Card
+                    // App Lock & Biometrics Controls
                     CyberCard(modifier = Modifier.fillMaxWidth(), backgroundColor = CyberCardElevated) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isBiometricUnlocked) CyberSuccess.copy(alpha = 0.15f) else CyberDanger.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = if (isBiometricUnlocked) Icons.Default.LockOpen else Icons.Default.Lock,
-                                        contentDescription = null,
-                                        tint = if (isBiometricUnlocked) CyberSuccess else CyberDanger,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            // Master Lock Toggle
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isLockEnabled) CyberSuccess.copy(alpha = 0.15f) else CyberDanger.copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isLockEnabled) Icons.Default.Lock else Icons.Default.LockOpen,
+                                            contentDescription = null,
+                                            tint = if (isLockEnabled) CyberSuccess else CyberDanger,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text("نظام قفل المنظومة والأمان", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text(
+                                            text = if (isLockEnabled) "الحماية نشطة (PIN + البصمة)" else "نظام القفل معطل",
+                                            color = TextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text("القفل البيومتري وحماية الشاشة", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text(
-                                        text = if (isBiometricUnlocked) "المنصة مفعلة ومفتوحة" else "المنصة مقفلة بالبصمة",
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
+
+                                Switch(
+                                    checked = isLockEnabled,
+                                    onCheckedChange = { viewModel.setLockEnabled(it) },
+                                    modifier = Modifier.testTag("app_lock_switch"),
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = CyberSuccess,
+                                        checkedTrackColor = CyberSuccess.copy(alpha = 0.3f),
+                                        uncheckedThumbColor = CyberDanger,
+                                        uncheckedTrackColor = CyberDanger.copy(alpha = 0.3f)
                                     )
-                                }
+                                )
                             }
 
-                            Switch(
-                                checked = isBiometricUnlocked,
-                                onCheckedChange = { viewModel.toggleBiometricLock() },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = CyberSuccess,
-                                    checkedTrackColor = CyberSuccess.copy(alpha = 0.3f),
-                                    uncheckedThumbColor = CyberDanger,
-                                    uncheckedTrackColor = CyberDanger.copy(alpha = 0.3f)
+                            if (isLockEnabled) {
+                                androidx.compose.material3.HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                    thickness = 1.dp
                                 )
-                            )
+
+                                // Biometric Sensor Toggle
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Fingerprint, contentDescription = null, tint = CyberPrimaryLight, modifier = Modifier.size(22.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text("المصادقة الحيوية (بصمة / وجه)", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                            Text("طلب البصمة التلقائية عند الفتح", color = TextSecondary, fontSize = 11.sp)
+                                        }
+                                    }
+
+                                    Switch(
+                                        checked = isBiometricHardwareEnabled,
+                                        onCheckedChange = { viewModel.setBiometricHardwareEnabled(it) },
+                                        modifier = Modifier.testTag("biometric_sensor_switch")
+                                    )
+                                }
+
+                                // PIN Code Row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Key, contentDescription = null, tint = CyberSecondary, modifier = Modifier.size(22.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text("رمز PIN السري", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                            Text("الرمز مكون من ${appPin.length} أرقام", color = TextSecondary, fontSize = 11.sp)
+                                        }
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = { showChangePinDialog = true },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.testTag("change_pin_button")
+                                    ) {
+                                        Text("تعديل الرمز", fontSize = 12.sp)
+                                    }
+                                }
+
+                                // Auto-Lock Timeout Selection
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.LockClock, contentDescription = null, tint = CyberWarning, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("توقيت القفل التلقائي عند الخروج:", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        val intervals = listOf(
+                                            Pair("فوري", "IMMEDIATE"),
+                                            Pair("دقيقة", "1_MIN"),
+                                            Pair("5 د", "5_MIN"),
+                                            Pair("15 د", "15_MIN"),
+                                            Pair("إيقاف", "NEVER")
+                                        )
+                                        intervals.forEach { (label, key) ->
+                                            FilterChip(
+                                                selected = autoLockInterval == key,
+                                                onClick = { viewModel.setAutoLockInterval(key) },
+                                                label = { Text(label, fontSize = 11.sp) },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = CyberPrimary.copy(alpha = 0.2f),
+                                                    selectedLabelColor = CyberPrimaryLight
+                                                ),
+                                                modifier = Modifier.weight(1f).testTag("autolock_$key")
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Lock Platform Now Button
+                                Button(
+                                    onClick = { viewModel.lockBiometrics() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = CyberDanger.copy(alpha = 0.2f), contentColor = CyberDanger),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth().testTag("lock_now_button")
+                                ) {
+                                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("قفل المنظومة فوراً", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
                         }
                     }
 
@@ -422,6 +547,170 @@ fun AuditAndSecurityScreen(
             }
         }
     }
+
+    if (showChangePinDialog) {
+        ChangePinDialog(
+            onDismiss = { showChangePinDialog = false },
+            onConfirmChange = { oldPin, newPin ->
+                val (success, _) = viewModel.changePin(oldPin, newPin)
+                if (success) {
+                    showChangePinDialog = false
+                }
+                success
+            }
+        )
+    }
+}
+
+@Composable
+fun ChangePinDialog(
+    onDismiss: () -> Unit,
+    onConfirmChange: (String, String) -> Boolean
+) {
+    var oldPin by remember { mutableStateOf("") }
+    var newPin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var showOldPin by remember { mutableStateOf(false) }
+    var showNewPin by remember { mutableStateOf(false) }
+    var errorText by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Key, contentDescription = null, tint = CyberPrimary, modifier = Modifier.size(22.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("تغيير رمز PIN السري", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "أدخل رمز PIN الحالي متبوعاً بالرمز الجديد المكون من 4 إلى 6 أرقام.",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+
+                // Old PIN
+                OutlinedTextField(
+                    value = oldPin,
+                    onValueChange = {
+                        if (it.length <= 6 && it.all { c -> c.isDigit() }) oldPin = it
+                    },
+                    label = { Text("رمز PIN الحالي") },
+                    visualTransformation = if (showOldPin) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    trailingIcon = {
+                        IconButton(onClick = { showOldPin = !showOldPin }) {
+                            Icon(
+                                imageVector = if (showOldPin) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = TextSecondary
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("input_old_pin"),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CyberPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
+                )
+
+                // New PIN
+                OutlinedTextField(
+                    value = newPin,
+                    onValueChange = {
+                        if (it.length <= 6 && it.all { c -> c.isDigit() }) newPin = it
+                    },
+                    label = { Text("رمز PIN الجديد (4-6 أرقام)") },
+                    visualTransformation = if (showNewPin) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    trailingIcon = {
+                        IconButton(onClick = { showNewPin = !showNewPin }) {
+                            Icon(
+                                imageVector = if (showNewPin) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = TextSecondary
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("input_new_pin"),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CyberPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
+                )
+
+                // Confirm New PIN
+                OutlinedTextField(
+                    value = confirmPin,
+                    onValueChange = {
+                        if (it.length <= 6 && it.all { c -> c.isDigit() }) confirmPin = it
+                    },
+                    label = { Text("تأكيد رمز PIN الجديد") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    modifier = Modifier.fillMaxWidth().testTag("input_confirm_pin"),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CyberPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
+                )
+
+                if (errorText.isNotBlank()) {
+                    Text(
+                        text = errorText,
+                        color = CyberDanger,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (oldPin.isBlank()) {
+                        errorText = "يرجى إدخال رمز PIN الحالي"
+                        return@Button
+                    }
+                    if (newPin.length !in 4..6) {
+                        errorText = "يجب أن يتكون الرمز الجديد من 4 إلى 6 أرقام"
+                        return@Button
+                    }
+                    if (newPin != confirmPin) {
+                        errorText = "رمز PIN الجديد وتأكيده غير متطابقين"
+                        return@Button
+                    }
+                    val ok = onConfirmChange(oldPin, newPin)
+                    if (!ok) {
+                        errorText = "رمز PIN الحالي غير صحيح"
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.testTag("confirm_change_pin_button")
+            ) {
+                Text("حفظ التغيير")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("cancel_change_pin_button")
+            ) {
+                Text("إلغاء", color = TextSecondary)
+            }
+        },
+        containerColor = CyberCardElevated,
+        shape = RoundedCornerShape(16.dp)
+    )
 }
 
 @Composable

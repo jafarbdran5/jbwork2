@@ -106,6 +106,8 @@ import com.example.ui.screens.knowledge.KnowledgeBaseScreen
 import com.example.ui.screens.reports.ReportsScreen
 import com.example.ui.screens.search.GlobalSearchScreen
 import com.example.ui.screens.security.AuditAndSecurityScreen
+import com.example.ui.screens.security.BiometricLockScreen
+import com.example.ui.screens.security.BiometricPromptHelper
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.studio.ContentStudioScreen
 import com.example.ui.screens.support.SupportFormsScreen
@@ -144,9 +146,23 @@ enum class ScreenDestination(val id: Int, val title: String, val icon: ImageVect
     SECURITY(11, "سجل الأمان والتدقيق", Icons.Default.Security)
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : androidx.fragment.app.FragmentActivity() {
 
     private val viewModel: ForensicViewModel by viewModels()
+    private var lastBackgroundTime: Long = 0L
+
+    override fun onStop() {
+        super.onStop()
+        lastBackgroundTime = System.currentTimeMillis()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (lastBackgroundTime > 0L) {
+            val elapsed = System.currentTimeMillis() - lastBackgroundTime
+            viewModel.checkAutoLockOnResume(elapsed)
+        }
+    }
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -211,6 +227,7 @@ class MainActivity : ComponentActivity() {
 
                     ModalNavigationDrawer(
                         drawerState = drawerState,
+                        gesturesEnabled = drawerState.isOpen,
                         drawerContent = {
                             ModalDrawerSheet(
                                 drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -494,93 +511,42 @@ class MainActivity : ComponentActivity() {
                             }
 
                             // Floating Non-Blocking HUD Banner
-                            NonBlockingHudOverlay(
-                                message = hudMessage,
-                                onDismiss = { viewModel.dismissHud() },
-                                modifier = Modifier
-                                    .align(Alignment.TopCenter)
-                                    .padding(top = 70.dp)
-                            )
+                            if (hudMessage != null) {
+                                NonBlockingHudOverlay(
+                                    message = hudMessage,
+                                    onDismiss = { viewModel.dismissHud() },
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 70.dp)
+                                )
+                            }
 
                             // Biometric Lock Overlay (Non-blocking screen cover when locked)
-                            AnimatedVisibility(
-                                visible = !isBiometricUnlocked,
-                                enter = fadeIn(),
-                                exit = fadeOut()
-                            ) {
-                                BiometricLockScreen(
-                                    onUnlock = { viewModel.toggleBiometricLock() }
-                                )
+                            if (!isBiometricUnlocked) {
+                                AnimatedVisibility(
+                                    visible = !isBiometricUnlocked,
+                                    enter = fadeIn(),
+                                    exit = fadeOut()
+                                ) {
+                                    val isBioHardwareAvailable = remember {
+                                        BiometricPromptHelper.isBiometricAvailable(this@MainActivity)
+                                    }
+                                    BiometricLockScreen(
+                                        onVerifyPin = { pin -> viewModel.verifyPin(pin) },
+                                        onTriggerBiometric = {
+                                            BiometricPromptHelper.authenticate(
+                                                activity = this@MainActivity,
+                                                onSuccess = { viewModel.unlockBiometrics() },
+                                                onError = { err -> viewModel.showHud(err, HudType.WARNING) }
+                                            )
+                                        },
+                                        isBiometricAvailable = isBioHardwareAvailable
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun BiometricLockScreen(onUnlock: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.98f))
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(90.dp)
-                    .clip(CircleShape)
-                    .background(CyberPrimary.copy(alpha = 0.15f))
-                    .border(2.dp, CyberPrimary, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Fingerprint,
-                    contentDescription = "بصمة الإصبع",
-                    tint = CyberPrimary,
-                    modifier = Modifier.size(54.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "المنظومة مقفلة بالأمان الحيوي",
-                color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "البيانات والملفات مشفرة وفق معايير الأمان المتقدمة. المس مستشعر البصمة للمتابعة.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 13.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            Button(
-                onClick = onUnlock,
-                colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth(0.7f)
-                    .height(48.dp)
-                    .testTag("biometric_unlock_button")
-            ) {
-                Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("تأكيد البصمة وفك القفل", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         }
     }

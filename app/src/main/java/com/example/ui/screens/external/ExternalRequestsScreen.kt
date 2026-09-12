@@ -8,6 +8,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -128,171 +130,262 @@ fun ExternalRequestsScreen(
         "مصادر البيانات" to sources.size
     )
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { isAddSourceOpen = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "إضافة مصدر Google Sheet")
-            }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header Bar
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "الطلبات الخارجية (Google Sheets)",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "استقبال ومعالجة قضايا وطلبات العملاء الواردة بدون تسجيل دخول",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        // Quick Actions
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = { viewModel.syncAllExternalSources() },
-                                shape = RoundedCornerShape(10.dp),
-                                enabled = !isSyncing
-                            ) {
-                                if (isSyncing) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("مزامنة...", fontSize = 11.sp)
-                                } else {
-                                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("مزامنة الكل", fontSize = 11.sp)
-                                }
-                            }
-
-                            Button(
-                                onClick = { isManageSourcesOpen = true },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                            ) {
-                                Icon(Icons.Default.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("المصادر (${sources.size})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Metric Counters Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        MetricCard(
-                            label = "إجمالي الطلبات",
-                            count = rawRequests.size.toString(),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        MetricCard(
-                            label = "طلبات جديدة",
-                            count = rawRequests.count { it.status == "جديد" }.toString(),
-                            color = Color(0xFFE65100),
-                            modifier = Modifier.weight(1f)
-                        )
-                        MetricCard(
-                            label = "قيد المعالجة",
-                            count = rawRequests.count { it.status == "قيد المراجعة" || it.status == "قيد المعالجة" }.toString(),
-                            color = Color(0xFF0288D1),
-                            modifier = Modifier.weight(1f)
-                        )
-                        MetricCard(
-                            label = "تم تحويلها",
-                            count = rawRequests.count { it.status == "تم تحويله إلى قضية" }.toString(),
-                            color = Color(0xFF673AB7),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-
-            // Tabs Row
-            ScrollableTabRow(
-                selectedTabIndex = tabs.indexOfFirst { it.first == activeTab }.coerceAtLeast(0),
-                edgePadding = 16.dp,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary,
-                indicator = { tabPositions ->
-                    val index = tabs.indexOfFirst { it.first == activeTab }.coerceAtLeast(0)
-                    if (index < tabPositions.size) {
-                        TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[index]),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            ) {
-                tabs.forEach { (title, count) ->
-                    Tab(
-                        selected = activeTab == title,
-                        onClick = { viewModel.externalRequestActiveTab.value = title },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Header Banner Card
+            item(key = "header_banner") {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = title,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (activeTab == title) FontWeight.Bold else FontWeight.Normal
+                                    text = "الطلبات الخارجية (Google Sheets)",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (activeTab == title) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                                Text(
+                                    text = "استقبال ومعالجة قضايا وطلبات العملاء بدون تعديل على الملف الأصلي",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                OutlinedButton(
+                                    onClick = { viewModel.syncAllExternalSources() },
+                                    shape = RoundedCornerShape(10.dp),
+                                    enabled = !isSyncing,
+                                    modifier = Modifier.height(38.dp)
                                 ) {
-                                    Text(
-                                        text = count.toString(),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
+                                    if (isSyncing) {
+                                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("مزامنة...", fontSize = 11.sp)
+                                    } else {
+                                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("مزامنة", fontSize = 11.sp)
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { isManageSourcesOpen = true },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                                    modifier = Modifier.height(38.dp)
+                                ) {
+                                    Icon(Icons.Default.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("المصادر (${sources.size})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
                                 }
                             }
                         }
-                    )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Responsive 2x2 Metric Counters
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            MetricCard(
+                                label = "إجمالي الطلبات",
+                                count = rawRequests.size.toString(),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            MetricCard(
+                                label = "طلبات جديدة",
+                                count = rawRequests.count { it.status == "جديد" }.toString(),
+                                color = Color(0xFFE65100),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            MetricCard(
+                                label = "قيد المعالجة",
+                                count = rawRequests.count { it.status == "قيد المراجعة" || it.status == "قيد المعالجة" }.toString(),
+                                color = Color(0xFF0288D1),
+                                modifier = Modifier.weight(1f)
+                            )
+                            MetricCard(
+                                label = "تم تحويلها لقضايا",
+                                count = rawRequests.count { it.status == "تم تحويله إلى قضية" }.toString(),
+                                color = Color(0xFF673AB7),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
             }
 
-            // Body Content
+            // Tabs Row (Horizontal Filter Chips)
+            item(key = "tabs_row") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    tabs.forEach { (title, count) ->
+                        val isSelected = activeTab == title
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { viewModel.externalRequestActiveTab.value = title },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = title,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Text(
+                                            text = count.toString(),
+                                            fontSize = 10.sp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
+                }
+            }
+
             if (activeTab == "مصادر البيانات") {
-                // Embedded Sources View
-                EmbeddedSourcesSection(
-                    viewModel = viewModel,
-                    onOpenAddSource = { isAddSourceOpen = true },
-                    onManageSources = { isManageSourcesOpen = true },
-                    onOpenSheetsManager = { sourceForSheetsManager = it }
-                )
+                // Section Header for Sources
+                item(key = "sources_banner_row") {
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "قائمة مصادر Google Sheets المربوطة (${sources.size})",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "اضغط على أي بطاقة للدخول إلى أوراقها وإدارتها وتعيين أعمدتها",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Button(
+                                onClick = { isAddSourceOpen = true },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("إضافة مصدر", fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+
+                if (sources.isEmpty()) {
+                    item(key = "empty_sources_card") {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    Icons.Default.TableChart,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(56.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "لا توجد مصادر Google Sheets مضافة حالياً",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "أضف رابط Google Sheet عام للبدء في استيراد طلبات وقضايا العملاء مباشرة للقراءة فقط.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = { isAddSourceOpen = true },
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("إضافة مصدر Google Sheet الآن", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    items(sources, key = { it.id }) { src ->
+                        val sourceSheets = sheets.filter { it.sourceId == src.id }
+                        val activeSheetsCount = sourceSheets.count { it.enabled && !it.ignored }
+                        val reqsCount = rawRequests.count { it.sourceId == src.id }
+
+                        SourceCardItem(
+                            src = src,
+                            sourceSheets = sourceSheets,
+                            activeSheetsCount = activeSheetsCount,
+                            reqsCount = reqsCount,
+                            viewModel = viewModel,
+                            onOpenSheetsManager = { sourceForSheetsManager = src }
+                        )
+                    }
+                }
             } else {
-                // Search & Filter Bar
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                // Search Input Field
+                item(key = "search_field_item") {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { viewModel.externalRequestSearchQuery.value = it },
@@ -309,11 +402,11 @@ fun ExternalRequestsScreen(
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // Connected Google Sheets Sources Banner
-                    if (sources.isNotEmpty()) {
+                // Sources filter chips
+                if (sources.isNotEmpty()) {
+                    item(key = "sources_filter_row") {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -321,78 +414,38 @@ fun ExternalRequestsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Text("المصدر:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                            FilterChip(
+                                selected = sourceFilter == "الكل",
+                                onClick = { viewModel.externalRequestSourceFilter.value = "الكل" },
+                                label = { Text("كل المصادر (${rawRequests.size})", fontSize = 11.sp) },
+                                shape = RoundedCornerShape(8.dp)
+                            )
+
                             sources.forEach { src ->
-                                val srcSheets = sheets.filter { it.sourceId == src.id }
                                 val srcRequestsCount = rawRequests.count { it.sourceId == src.id }
+                                val isSelected = sourceFilter == src.id
 
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (sourceFilter == src.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                    ),
-                                    modifier = Modifier.clickable {
-                                        viewModel.externalRequestSourceFilter.value = if (sourceFilter == src.id) "الكل" else src.id
-                                    }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.TableChart,
-                                            contentDescription = null,
-                                            tint = Color(0xFF2E7D32),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-
-                                        Column {
-                                            Text(
-                                                text = src.name,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Text(
-                                                text = "${srcSheets.size} أوراق • $srcRequestsCount طلب",
-                                                fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-
-                                        // Quick Sheets Management Button
-                                        OutlinedButton(
-                                            onClick = { sourceForSheetsManager = src },
-                                            shape = RoundedCornerShape(6.dp),
-                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                            modifier = Modifier.height(28.dp)
-                                        ) {
-                                            Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(12.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("إدارة الأوراق", fontSize = 10.sp)
-                                        }
-
-                                        // Quick Sync Button
-                                        IconButton(
-                                            onClick = { viewModel.syncExternalSource(src.id) },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(Icons.Default.Sync, contentDescription = "مزامنة سريعة", modifier = Modifier.size(14.dp))
-                                        }
-                                    }
-                                }
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        viewModel.externalRequestSourceFilter.value = if (isSelected) "الكل" else src.id
+                                    },
+                                    label = {
+                                        Text("${src.name} ($srcRequestsCount)", fontSize = 11.sp)
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                )
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(6.dp))
                     }
+                }
 
-                    // Sheets Filter Chips
-                    val relevantSheets = if (sourceFilter != "الكل") sheets.filter { it.sourceId == sourceFilter } else sheets
-                    if (relevantSheets.isNotEmpty()) {
+                // Sheets filter chips
+                val relevantSheets = if (sourceFilter != "الكل") sheets.filter { it.sourceId == sourceFilter } else sheets
+                if (relevantSheets.isNotEmpty()) {
+                    item(key = "sheets_filter_row") {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -427,20 +480,20 @@ fun ExternalRequestsScreen(
                                 )
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(6.dp))
                     }
+                }
 
-                    // Filters Chips (Urgency & Source)
+                // Urgency filter chips
+                item(key = "urgency_filter_row") {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("الأهمية:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                        // All Urgencies
                         listOf("الكل", "حرجة", "عالية", "متوسطة", "منخفضة").forEach { urg ->
                             FilterChip(
                                 selected = urgencyFilter == urg,
@@ -454,65 +507,75 @@ fun ExternalRequestsScreen(
 
                 // Requests List or Empty State
                 if (filteredRequests.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.CloudDownload,
-                                contentDescription = null,
-                                modifier = Modifier.size(56.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "لا توجد طلبات تطابق الفلاتر المحددة",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "تأكد من مزامنة مصادر Google Sheets أو إضافة مصدر جديد لاستقبال الطلبات.",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = { isAddSourceOpen = true },
-                                shape = RoundedCornerShape(10.dp)
+                    item(key = "empty_requests_box") {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("إضافة مصدر Google Sheet الآن", fontSize = 12.sp)
+                                Icon(
+                                    Icons.Default.CloudDownload,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(56.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "لا توجد طلبات تطابق الفلاتر المحددة",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "تأكد من مزامنة مصادر Google Sheets أو تعديل عبارة البحث والفلاتر.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = { isAddSourceOpen = true },
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("إضافة مصدر Google Sheet الآن", fontSize = 12.sp)
+                                }
                             }
                         }
                     }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(filteredRequests, key = { it.id }) { request ->
-                            ExternalRequestCard(
-                                request = request,
-                                viewModel = viewModel,
-                                onOpenDetails = { selectedRequestForDetails = request },
-                                onConvertToCase = { selectedRequestForConversion = request },
-                                onOpenCase = onOpenCase
-                            )
-                        }
-                        item {
-                            Spacer(modifier = Modifier.height(80.dp))
-                        }
+                    items(filteredRequests, key = { it.id }) { request ->
+                        ExternalRequestCard(
+                            request = request,
+                            viewModel = viewModel,
+                            onOpenDetails = { selectedRequestForDetails = request },
+                            onConvertToCase = { selectedRequestForConversion = request },
+                            onOpenCase = onOpenCase
+                        )
                     }
                 }
             }
+        }
+
+        // Floating Action Button
+        FloatingActionButton(
+            onClick = { isAddSourceOpen = true },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+                .testTag("add_external_source_fab")
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "إضافة مصدر Google Sheet")
         }
     }
 
@@ -622,12 +685,11 @@ private fun ExternalRequestCard(
     var showMenu by remember { mutableStateOf(false) }
 
     Card(
+        onClick = onOpenDetails,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onOpenDetails() }
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             // Top Row: Request Number, Sheet badge, Urgency, Status
@@ -889,128 +951,190 @@ private fun ExternalRequestCard(
 }
 
 @Composable
-private fun EmbeddedSourcesSection(
+private fun SourceCardItem(
+    src: ExternalRequestSourceEntity,
+    sourceSheets: List<ExternalSheetEntity>,
+    activeSheetsCount: Int,
+    reqsCount: Int,
     viewModel: ForensicViewModel,
-    onOpenAddSource: () -> Unit,
-    onManageSources: () -> Unit,
-    onOpenSheetsManager: (ExternalRequestSourceEntity) -> Unit
+    onOpenSheetsManager: () -> Unit
 ) {
-    val sources by viewModel.rawExternalSources.collectAsState()
-    val allSheets by viewModel.rawExternalSheets.collectAsState()
-    val allRequests by viewModel.rawExternalRequests.collectAsState()
-    val isSyncing by viewModel.isExternalSyncing.collectAsState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+    Card(
+        onClick = onOpenSheetsManager,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (src.enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else Color.Gray.copy(alpha = 0.2f)
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        // Section Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "مصادر Google Sheets (${sources.size}):",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "اضغط على أي مصدر للدخول إلى أوراقه وإدارتها وتعيين أعمدتها",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { viewModel.syncAllExternalSources() },
-                    shape = RoundedCornerShape(8.dp),
-                    enabled = !isSyncing
-                ) {
-                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("مزامنة الكل", fontSize = 11.sp)
-                }
-
-                Button(
-                    onClick = onOpenAddSource,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("إضافة مصدر", fontSize = 11.sp)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        if (sources.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.TableChart,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier.size(54.dp)
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "لا توجد مصادر Google Sheets مضافة حالياً.",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "أضف رابط Google Sheet عام للبدء في استيراد طلبات وقضايا العملاء.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = onOpenAddSource,
-                        shape = RoundedCornerShape(10.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (src.status.contains("خطأ")) Color(0xFFD32F2F).copy(alpha = 0.15f) else Color(0xFF388E3C).copy(alpha = 0.15f),
+                        modifier = Modifier.padding(end = 8.dp)
                     ) {
-                        Text("إضافة مصدر Google Sheet الآن", fontSize = 12.sp)
+                        Text(
+                            text = src.status,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (src.status.contains("خطأ")) Color(0xFFD32F2F) else Color(0xFF388E3C),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = src.name,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Spreadsheet ID: ${src.spreadsheetId.take(16)}...",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (src.enabled) "نشط" else "معطل",
+                        fontSize = 11.sp,
+                        color = if (src.enabled) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Switch(
+                        checked = src.enabled,
+                        onCheckedChange = { viewModel.toggleExternalSource(src.id, it) },
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Metric Chips Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("الأوراق المكتشفة", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${sourceSheets.size} (مفعلة: $activeSheetsCount)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("الطلبات المستوردة", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$reqsCount طلب", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.weight(1.2f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("آخر مزامنة", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val syncTime = src.lastSync ?: 0L
+                        val lastSyncFormatted = if (syncTime > 0L) {
+                            val diffMinutes = (System.currentTimeMillis() - syncTime) / (60 * 1000)
+                            if (diffMinutes < 1) "الآن" else "منذ $diffMinutes دقيقة"
+                        } else "لم تتم بعد"
+                        Text(lastSyncFormatted, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                     }
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(sources, key = { it.id }) { src ->
-                    val sourceSheets = allSheets.filter { it.sourceId == src.id }
-                    val activeSheetsCount = sourceSheets.count { it.enabled && !it.ignored }
-                    val ignoredSheetsCount = sourceSheets.count { it.ignored }
-                    val reqsCount = allRequests.count { it.sourceId == src.id }
 
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(16.dp),
-                        shadowElevation = 2.dp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(
-                                1.dp,
-                                if (src.enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else Color.Gray.copy(alpha = 0.2f),
-                                RoundedCornerShape(16.dp)
-                            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // Action buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onOpenSheetsManager,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Icon(Icons.Default.Layers, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("دخول وإدارة الأوراق (${sourceSheets.size})", fontSize = 12.sp)
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(
+                        onClick = { viewModel.refreshSheetsForSource(src.id) },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(36.dp)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            // Header Row
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("فحص جديد", fontSize = 11.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.syncExternalSource(src.id) },
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = src.enabled,
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("مزامنة", fontSize = 11.sp)
+                    }
+                }
+            }
+
+            // Quick Sheet Preview if sheets are available
+            if (sourceSheets.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "معاينة أوراق العمل المكتشفة:",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        sourceSheets.take(4).forEach { sheet ->
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1018,214 +1142,54 @@ private fun EmbeddedSourcesSection(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (src.status.contains("خطأ")) Color(0xFFD32F2F).copy(alpha = 0.15f) else Color(0xFF388E3C).copy(alpha = 0.15f),
-                                        modifier = Modifier.padding(end = 8.dp)
-                                    ) {
-                                        Text(
-                                            text = src.status,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (src.status.contains("خطأ")) Color(0xFFD32F2F) else Color(0xFF388E3C),
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-
-                                    Column {
-                                        Text(
-                                            text = src.name,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = "ID: ${src.spreadsheetId.take(18)}...",
-                                            fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                    Icon(
+                                        Icons.Default.TableChart,
+                                        contentDescription = null,
+                                        tint = if (sheet.enabled && !sheet.ignored) MaterialTheme.colorScheme.primary else Color.Gray,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = sheet.customDisplayName ?: sheet.sheetName,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (sheet.enabled && !sheet.ignored) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = if (sheet.ignored) Color.Gray else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1
+                                    )
+                                    if (sheet.ignored) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("(متجاهلة)", fontSize = 10.sp, color = Color(0xFFD32F2F))
+                                    } else if (!sheet.enabled) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("(معطلة)", fontSize = 10.sp, color = Color.Gray)
                                     }
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = if (src.enabled) "نشط" else "معطل",
-                                        fontSize = 11.sp,
-                                        color = if (src.enabled) MaterialTheme.colorScheme.primary else Color.Gray
+                                        text = "${sheet.rowCount} صف",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Switch(
-                                        checked = src.enabled,
-                                        onCheckedChange = { viewModel.toggleExternalSource(src.id, it) },
-                                        modifier = Modifier.size(36.dp)
+                                        checked = sheet.enabled && !sheet.ignored,
+                                        onCheckedChange = { viewModel.toggleSheetEnabled(sheet.id, it) },
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
                             }
+                        }
 
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Metric Chips Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
-                                        Text("الأوراق المكتشفة", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text("${sourceSheets.size} (مفعلة: $activeSheetsCount)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
-                                        Text("الطلبات المستوردة", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text("$reqsCount طلب", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier.weight(1.2f)
-                                ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
-                                        Text("حالة المزامنة", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text(src.status.take(18), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                            // Action buttons: Enter Sheet Management, Sync, Refresh sheets
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Button(
-                                    onClick = { onOpenSheetsManager(src) },
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                    modifier = Modifier.height(36.dp)
-                                ) {
-                                    Icon(Icons.Default.Layers, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("دخول وإدارة الأوراق (${sourceSheets.size})", fontSize = 12.sp)
-                                }
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    OutlinedButton(
-                                        onClick = { viewModel.refreshSheetsForSource(src.id) },
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.height(36.dp)
-                                    ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("فحص جديد", fontSize = 11.sp)
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = { viewModel.syncExternalSource(src.id) },
-                                        shape = RoundedCornerShape(8.dp),
-                                        enabled = src.enabled,
-                                        modifier = Modifier.height(36.dp)
-                                    ) {
-                                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("مزامنة", fontSize = 11.sp)
-                                    }
-                                }
-                            }
-
-                            // Quick Sheet Preview if sheets are available
-                            if (sourceSheets.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
-                                        Text(
-                                            text = "معاينة أوراق العمل المكتشفة:",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        sourceSheets.take(4).forEach { sheet ->
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 3.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    modifier = Modifier.weight(1f)
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.TableChart,
-                                                        contentDescription = null,
-                                                        tint = if (sheet.enabled && !sheet.ignored) MaterialTheme.colorScheme.primary else Color.Gray,
-                                                        modifier = Modifier.size(14.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    Text(
-                                                        text = sheet.customDisplayName ?: sheet.sheetName,
-                                                        fontSize = 12.sp,
-                                                        fontWeight = if (sheet.enabled && !sheet.ignored) FontWeight.SemiBold else FontWeight.Normal,
-                                                        color = if (sheet.ignored) Color.Gray else MaterialTheme.colorScheme.onSurface,
-                                                        maxLines = 1
-                                                    )
-                                                    if (sheet.ignored) {
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("(متجاهلة)", fontSize = 10.sp, color = Color(0xFFD32F2F))
-                                                    } else if (!sheet.enabled) {
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("(معطلة)", fontSize = 10.sp, color = Color.Gray)
-                                                    }
-                                                }
-
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Text(
-                                                        text = "${sheet.rowCount} صف",
-                                                        fontSize = 10.sp,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Switch(
-                                                        checked = sheet.enabled && !sheet.ignored,
-                                                        onCheckedChange = { viewModel.toggleSheetEnabled(sheet.id, it) },
-                                                        modifier = Modifier.size(28.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        if (sourceSheets.size > 4) {
-                                            Text(
-                                                text = "+ ${sourceSheets.size - 4} أوراق أخرى... اضغط 'دخول وإدارة الأوراق' لعرض الجميع",
-                                                fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier
-                                                    .clickable { onOpenSheetsManager(src) }
-                                                    .padding(top = 4.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                        if (sourceSheets.size > 4) {
+                            Text(
+                                text = "+ ${sourceSheets.size - 4} أوراق أخرى... اضغط 'دخول وإدارة الأوراق' لعرض الجميع",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable { onOpenSheetsManager() }
+                                    .padding(top = 4.dp)
+                            )
                         }
                     }
                 }

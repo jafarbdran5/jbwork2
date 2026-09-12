@@ -38,6 +38,86 @@ class ExternalRequestsRepository(
     suspend fun testConnection(publicUrl: String): Result<String> =
         sheetsService.testConnection(publicUrl)
 
+    suspend fun runSpreadsheetDiagnostic(publicUrl: String) =
+        sheetsService.runFullSpreadsheetDiagnostic(publicUrl)
+
+    suspend fun addCsvSource(name: String, csvContent: String): Result<ExternalRequestSourceEntity> = withContext(Dispatchers.IO) {
+        try {
+            val sourceId = "src_csv_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}"
+            val source = ExternalRequestSourceEntity(
+                id = sourceId,
+                name = name.trim().ifBlank { "مصدر CSV مستورد" },
+                publicUrl = "offline://csv_import",
+                spreadsheetId = "CSV_IMPORT_${UUID.randomUUID().toString().take(8)}",
+                sourceType = "CSV_IMPORT",
+                enabled = true,
+                status = "محلي (Offline)",
+                lastSync = System.currentTimeMillis()
+            )
+            sourceDao.insertOrUpdate(source)
+
+            val sheetEntity = ExternalSheetEntity(
+                id = "${sourceId}_0",
+                sourceId = sourceId,
+                sheetId = "0",
+                sheetName = "ورقة البيانات المستوردة",
+                enabled = true,
+                ignored = false,
+                rowCount = 0,
+                columnCount = 0,
+                lastSync = System.currentTimeMillis()
+            )
+            sheetDao.insertIfNotExists(sheetEntity)
+
+            val parsed = sheetsService.parseCsvStringToResult(csvContent, sheetEntity.sheetName)
+            if (parsed.isSuccess) {
+                val sheetData = parsed.getOrThrow()
+                sheetDao.updateMetrics(sheetEntity.id, sheetData.rowCount, sheetData.columnCount, System.currentTimeMillis())
+
+                val existingRequests = requestDao.getRequestsBySheetSync(sourceId, "0")
+                val existingFingerprints = existingRequests.map { it.rowId }.toSet()
+
+                val newRequests = sheetData.rows.filter { row ->
+                    !existingFingerprints.contains(row.rowId)
+                }.mapIndexed { index, row ->
+                    ExternalRequestEntity(
+                        id = "${source.id}_${source.spreadsheetId}_0_${row.rowId}",
+                        sourceId = sourceId,
+                        spreadsheetId = source.spreadsheetId,
+                        sheetId = "0",
+                        sheetName = sheetEntity.sheetName,
+                        rowId = row.rowId,
+                        requestNumber = "CSV-${source.id.takeLast(4)}-${index + 1}",
+                        clientName = row.clientName,
+                        clientPhone = row.clientPhone,
+                        clientEmail = row.clientEmail,
+                        description = row.description,
+                        urgency = row.urgency,
+                        receivedAt = row.receivedAt,
+                        status = "جديد",
+                        internalNotes = row.internalNotes,
+                        associatedCaseId = null,
+                        rawData = row.rawDataJson,
+                        additionalFields = row.additionalFieldsJson,
+                        createdAt = System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis()
+                    )
+                }
+                if (newRequests.isNotEmpty()) {
+                    requestDao.insertAll(newRequests)
+                }
+            }
+
+            Result.success(source)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun extractDocumentTitle(publicUrl: String): String = withContext(Dispatchers.IO) {
+        sheetsService.extractDocumentTitle(publicUrl)
+    }
+
     suspend fun addSource(name: String, publicUrl: String): Result<ExternalRequestSourceEntity> = withContext(Dispatchers.IO) {
         try {
             val trimmedUrl = publicUrl.trim()
@@ -46,10 +126,17 @@ class ExternalRequestsRepository(
                 return@withContext Result.failure(IllegalArgumentException("رابط Google Sheet غير صالح"))
             }
 
+            val detectedTitle = sheetsService.extractDocumentTitle(trimmedUrl)
+            val finalName = if (name.trim().isBlank() || name.trim() == "مصدر Google Sheet") {
+                detectedTitle.ifBlank { "مصدر Google Sheet" }
+            } else {
+                name.trim()
+            }
+
             val sourceId = "src_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}"
             val source = ExternalRequestSourceEntity(
                 id = sourceId,
-                name = name.trim().ifBlank { "مصدر Google Sheet" },
+                name = finalName,
                 publicUrl = trimmedUrl,
                 spreadsheetId = spreadsheetId,
                 sourceType = "GOOGLE_SHEETS",

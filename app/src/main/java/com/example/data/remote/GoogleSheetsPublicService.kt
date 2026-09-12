@@ -16,6 +16,17 @@ data class DiscoveredSheet(
     val sheetName: String
 )
 
+data class SpreadsheetDiagnosticReport(
+    val spreadsheetId: String,
+    val isAccessible: Boolean,
+    val isReadOnly: Boolean = true,
+    val accessMode: String = "المصدر للقراءة فقط (READ-ONLY)",
+    val statusMessage: String,
+    val discoveredSheets: List<DiscoveredSheet> = emptyList(),
+    val sampleHeaders: List<String> = emptyList(),
+    val sampleRowCount: Int = 0
+)
+
 data class ParsedRequestRow(
     val rowId: String,
     val clientName: String,
@@ -55,12 +66,24 @@ class GoogleSheetsPublicService {
          */
         fun extractSpreadsheetId(url: String): String {
             val trimmed = url.trim()
-            val matcher = Pattern.compile("/spreadsheets/d/(?:e/)?([a-zA-Z0-9-_]+)").matcher(trimmed)
-            if (matcher.find()) {
-                return matcher.group(1) ?: trimmed
+            val matcher1 = Pattern.compile("/spreadsheets/(?:u/\\d+/)?d/(?:e/)?([a-zA-Z0-9-_]+)").matcher(trimmed)
+            if (matcher1.find()) {
+                return matcher1.group(1) ?: trimmed
+            }
+            val matcher2 = Pattern.compile("/d/([a-zA-Z0-9-_]+)").matcher(trimmed)
+            if (matcher2.find()) {
+                return matcher2.group(1) ?: trimmed
+            }
+            val matcher3 = Pattern.compile("[?&]id=([a-zA-Z0-9-_]+)").matcher(trimmed)
+            if (matcher3.find()) {
+                return matcher3.group(1) ?: trimmed
+            }
+            val matcher4 = Pattern.compile("key=([a-zA-Z0-9-_]+)").matcher(trimmed)
+            if (matcher4.find()) {
+                return matcher4.group(1) ?: trimmed
             }
             // If user directly pasted the alphanumeric ID
-            if (trimmed.matches(Regex("^[a-zA-Z0-9-_]{20,}$"))) {
+            if (trimmed.matches(Regex("^[a-zA-Z0-9-_]{15,}$"))) {
                 return trimmed
             }
             return trimmed
@@ -73,6 +96,51 @@ class GoogleSheetsPublicService {
             val gidPattern = Pattern.compile("[#?&]gid=([0-9]+)")
             val matcher = gidPattern.matcher(url)
             return if (matcher.find()) matcher.group(1) else null
+        }
+    }
+
+    /**
+     * Extracts the real document title from the public Google Sheet HTML.
+     */
+    suspend fun extractDocumentTitle(publicUrl: String): String = withContext(Dispatchers.IO) {
+        try {
+            val spreadsheetId = extractSpreadsheetId(publicUrl)
+            if (spreadsheetId.isBlank()) return@withContext ""
+
+            val htmlUrl = "https://docs.google.com/spreadsheets/d/$spreadsheetId/htmlview"
+            val req = Request.Builder()
+                .url(htmlUrl)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                .build()
+            val resp = client.newCall(req).execute()
+            val html = resp.body?.string() ?: ""
+
+            // 1. Check meta og:title
+            val mOg = Pattern.compile("<meta\\s+property=[\"']og:title[\"']\\s+content=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE).matcher(html)
+            if (mOg.find()) {
+                val t = mOg.group(1)?.replace("- Google Sheets", "")?.replace("- جداول بيانات Google", "")?.trim()
+                if (!t.isNullOrBlank()) return@withContext t
+            }
+
+            // 2. Check doc-title div
+            val docTitlePattern = Pattern.compile("<div[^>]*id=[\"']doc-title[\"'][^>]*>.*?<span[^>]*class=[\"']name[\"'][^>]*>([^<]+)</span>", Pattern.CASE_INSENSITIVE or Pattern.DOTALL)
+            val m0 = docTitlePattern.matcher(html)
+            if (m0.find()) {
+                val full = m0.group(1)?.trim() ?: ""
+                val docName = if (full.contains(":")) full.substringBefore(":").trim() else full
+                if (docName.isNotBlank()) return@withContext docName
+            }
+
+            // 3. Check HTML <title> tag
+            val mTitle = Pattern.compile("<title>([^<]+)</title>", Pattern.CASE_INSENSITIVE).matcher(html)
+            if (mTitle.find()) {
+                val t = mTitle.group(1)?.replace("- Google Sheets", "")?.replace("- جداول بيانات Google", "")?.trim()
+                if (!t.isNullOrBlank()) return@withContext t
+            }
+            ""
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to extract document title", e)
+            ""
         }
     }
 
@@ -96,23 +164,37 @@ class GoogleSheetsPublicService {
             val code = response.code
             val body = response.body?.string() ?: ""
 
-            if (code in 200..299 && (body.contains("google.visualization") || body.contains("table") || body.contains("\"status\":\"ok\""))) {
-                Result.success("تم الاتصال بالملف العام بنجاح والقراءة متاحة دون تسجيل دخول.")
-            } else if (code == 404) {
-                Result.failure(Exception("الملف غير موجود (404). يرجى التأكد من صحة الرابط."))
+            val isGvizOk = code in 200..299 && (body.contains("google.visualization") || body.contains("table") || body.contains("\"status\":\"ok\""))
+
+            if (code == 404) {
+                return@withContext Result.failure(Exception("الملف غير موجود (404). يرجى التأكد من صحة الرابط."))
             } else if (code == 401 || code == 403 || body.contains("Sign in") || body.contains("accounts.google.com")) {
-                Result.failure(Exception("الملف خاص ويتطلب إذن وصول. يرجى تفعيل 'أي شخص لديه الرابط يمكنه العرض' (Anyone with link can view)."))
-            } else {
+                return@withContext Result.failure(Exception("الملف خاص ويتطلب إذن وصول. يرجى تفعيل خيار 'أي شخص لديه الرابط يمكنه العرض' (Anyone with link can view)."))
+            }
+
+            if (!isGvizOk) {
                 // Fallback test via htmlview
                 val htmlUrl = "https://docs.google.com/spreadsheets/d/$spreadsheetId/htmlview"
                 val htmlReq = Request.Builder().url(htmlUrl).build()
                 val htmlResp = client.newCall(htmlReq).execute()
-                if (htmlResp.isSuccessful) {
-                    Result.success("تم الاتصال بالملف العام بنجاح عبر htmlview.")
-                } else {
-                    Result.failure(Exception("تعذر القراءة: كود الاستجابة $code"))
+                if (!htmlResp.isSuccessful) {
+                    return@withContext Result.failure(Exception("تعذر القراءة من الرابط. كود الاستجابة: $code"))
                 }
             }
+
+            // Discover actual sheets and title
+            val docTitle = extractDocumentTitle(publicUrl)
+            val discoveredResult = discoverSheets(publicUrl)
+            val discoveredTabs = discoveredResult.getOrNull() ?: emptyList()
+
+            val titleDesc = if (docTitle.isNotBlank()) "«$docTitle»" else "الملف العام"
+            val tabsSummary = if (discoveredTabs.isNotEmpty()) {
+                "تم اكتشاف ${discoveredTabs.size} أوراق عمل: ${discoveredTabs.joinToString("، ") { it.sheetName }.take(80)}"
+            } else {
+                "القراءة متاحة بدون تسجيل دخول."
+            }
+
+            Result.success("تم الاتصال بنجاح بـ $titleDesc\n$tabsSummary")
         } catch (e: Exception) {
             Log.e(TAG, "Connection test failed", e)
             Result.failure(Exception("فشل الاتصال: ${e.localizedMessage ?: "تحقق من اتصالك بالإنترنت"}"))
@@ -336,6 +418,26 @@ class GoogleSheetsPublicService {
             }
 
             if (cleanJson.isBlank()) {
+                // FALLBACK: Attempt fetching via /export?format=csv
+                val csvGidPart = if (sheetGid.isNotBlank() && sheetGid != "0") "&gid=$sheetGid" else ""
+                val csvUrl = "https://docs.google.com/spreadsheets/d/$spreadsheetId/export?format=csv$csvGidPart"
+                try {
+                    val csvRequest = Request.Builder()
+                        .url(csvUrl)
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                        .build()
+                    val csvResponse = client.newCall(csvRequest).execute()
+                    val csvBody = csvResponse.body?.string() ?: ""
+                    if (csvResponse.isSuccessful && csvBody.isNotBlank() && (csvBody.contains(",") || csvBody.contains("\n"))) {
+                        val csvResult = parseCsvStringToResult(csvBody, sheetName, columnMapping)
+                        if (csvResult.isSuccess) {
+                            return@withContext csvResult
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "CSV fallback attempt failed", e)
+                }
+
                 return@withContext Result.failure(lastError ?: Exception("لم يتم استلام بيانات صالحة من الورقة '$sheetName'"))
             }
 
@@ -547,5 +649,209 @@ class GoogleSheetsPublicService {
             lower.contains("منخفض") || lower.contains("low") -> "منخفضة"
             else -> "متوسطة"
         }
+    }
+
+    /**
+     * Parses raw CSV string into a structured SheetReadResult adhering to RFC-4180 rules.
+     */
+    fun parseCsvStringToResult(
+        csvContent: String,
+        sheetName: String = "بيانات CSV",
+        columnMapping: Map<String, String> = emptyMap()
+    ): Result<SheetReadResult> {
+        return try {
+            val lines = parseCsvLines(csvContent)
+            if (lines.isEmpty()) {
+                return Result.failure(Exception("محتوى CSV فارغ"))
+            }
+
+            val headers = lines[0].map { it.trim() }
+            val parsedRows = mutableListOf<ParsedRequestRow>()
+            val rawTableList = mutableListOf<Map<String, String>>()
+
+            val mappedNameCol = columnMapping["clientName"]?.trim()?.lowercase()
+            val mappedPhoneCol = columnMapping["clientPhone"]?.trim()?.lowercase()
+            val mappedEmailCol = columnMapping["clientEmail"]?.trim()?.lowercase()
+            val mappedDescCol = columnMapping["description"]?.trim()?.lowercase()
+            val mappedUrgencyCol = columnMapping["urgency"]?.trim()?.lowercase()
+            val mappedDateCol = columnMapping["receivedAt"]?.trim()?.lowercase()
+            val mappedNotesCol = columnMapping["internalNotes"]?.trim()?.lowercase()
+
+            for (r in 1 until lines.size) {
+                val rowCells = lines[r]
+                if (rowCells.all { it.isBlank() }) continue
+
+                val rowMap = mutableMapOf<String, String>()
+                for (c in headers.indices) {
+                    val header = headers[c]
+                    val cellVal = rowCells.getOrNull(c)?.trim() ?: ""
+                    rowMap[header] = cellVal
+                }
+
+                rawTableList.add(rowMap)
+
+                var clientName = ""
+                var clientPhone = ""
+                var clientEmail = ""
+                var description = ""
+                var urgency = "متوسطة"
+                var receivedAt = ""
+                var internalNotes = ""
+                val additionalFields = mutableMapOf<String, String>()
+
+                for ((header, value) in rowMap) {
+                    val norm = header.lowercase()
+                    if (!mappedNameCol.isNullOrBlank() && norm == mappedNameCol && clientName.isBlank()) clientName = value
+                    else if (!mappedPhoneCol.isNullOrBlank() && norm == mappedPhoneCol && clientPhone.isBlank()) clientPhone = value
+                    else if (!mappedEmailCol.isNullOrBlank() && norm == mappedEmailCol && clientEmail.isBlank()) clientEmail = value
+                    else if (!mappedDescCol.isNullOrBlank() && norm == mappedDescCol && description.isBlank()) description = value
+                    else if (!mappedUrgencyCol.isNullOrBlank() && norm == mappedUrgencyCol) urgency = normalizeUrgency(value)
+                    else if (!mappedDateCol.isNullOrBlank() && norm == mappedDateCol && receivedAt.isBlank()) receivedAt = value
+                    else if (!mappedNotesCol.isNullOrBlank() && norm == mappedNotesCol && internalNotes.isBlank()) internalNotes = value
+                    else if (isNameHeader(norm) && clientName.isBlank()) clientName = value
+                    else if (isPhoneHeader(norm) && clientPhone.isBlank()) clientPhone = value
+                    else if (isEmailHeader(norm) && clientEmail.isBlank()) clientEmail = value
+                    else if (isDescriptionHeader(norm) && description.isBlank()) description = value
+                    else if (isDateHeader(norm) && receivedAt.isBlank()) receivedAt = value
+                    else if (isUrgencyHeader(norm)) urgency = normalizeUrgency(value)
+                    else if (isNotesHeader(norm) && internalNotes.isBlank()) internalNotes = value
+                    else if (value.isNotBlank()) additionalFields[header] = value
+                }
+
+                if (clientName.isBlank()) clientName = "طلب وارد (صف $r)"
+                if (description.isBlank()) description = additionalFields.values.firstOrNull() ?: "طلب مستورد من CSV"
+                if (receivedAt.isBlank()) {
+                    receivedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+                }
+
+                parsedRows.add(
+                    ParsedRequestRow(
+                        rowId = "row_$r",
+                        clientName = clientName,
+                        clientPhone = clientPhone,
+                        clientEmail = clientEmail,
+                        description = description,
+                        urgency = urgency,
+                        receivedAt = receivedAt,
+                        internalNotes = internalNotes,
+                        rawDataJson = JSONObject(rowMap as Map<*, *>).toString(),
+                        additionalFieldsJson = JSONObject(additionalFields as Map<*, *>).toString()
+                    )
+                )
+            }
+
+            Result.success(
+                SheetReadResult(
+                    sheetName = sheetName,
+                    rowCount = parsedRows.size,
+                    columnCount = headers.size,
+                    rows = parsedRows,
+                    detectedHeaders = headers,
+                    rawTable = rawTableList
+                )
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Splits CSV lines while respecting quotes and escaped commas.
+     */
+    private fun parseCsvLines(csv: String): List<List<String>> {
+        val result = mutableListOf<List<String>>()
+        val currentLine = mutableListOf<String>()
+        val currentCell = StringBuilder()
+        var insideQuotes = false
+
+        var i = 0
+        while (i < csv.length) {
+            val c = csv[i]
+            when {
+                c == '\"' -> {
+                    if (insideQuotes && i + 1 < csv.length && csv[i + 1] == '\"') {
+                        currentCell.append('\"')
+                        i++ // skip escaped quote
+                    } else {
+                        insideQuotes = !insideQuotes
+                    }
+                }
+                c == ',' && !insideQuotes -> {
+                    currentLine.add(currentCell.toString())
+                    currentCell.clear()
+                }
+                (c == '\n' || c == '\r') && !insideQuotes -> {
+                    if (c == '\r' && i + 1 < csv.length && csv[i + 1] == '\n') {
+                        i++
+                    }
+                    currentLine.add(currentCell.toString())
+                    currentCell.clear()
+                    if (currentLine.any { it.isNotBlank() }) {
+                        result.add(ArrayList(currentLine))
+                    }
+                    currentLine.clear()
+                }
+                else -> {
+                    currentCell.append(c)
+                }
+            }
+            i++
+        }
+
+        if (currentCell.isNotEmpty() || currentLine.isNotEmpty()) {
+            currentLine.add(currentCell.toString())
+            if (currentLine.any { it.isNotBlank() }) {
+                result.add(currentLine)
+            }
+        }
+        return result
+    }
+
+    /**
+     * Full diagnostic run for a Google Sheet URL.
+     * Extracts Spreadsheet ID, checks accessibility, discovers all sheets,
+     * reads headers, row counts, and verifies that it is strictly READ-ONLY.
+     */
+    suspend fun runFullSpreadsheetDiagnostic(publicUrl: String): SpreadsheetDiagnosticReport = withContext(Dispatchers.IO) {
+        val spreadsheetId = extractSpreadsheetId(publicUrl)
+        if (spreadsheetId.isBlank()) {
+            return@withContext SpreadsheetDiagnosticReport(
+                spreadsheetId = "",
+                isAccessible = false,
+                statusMessage = "رابط Google Sheet غير صالح، تعذر استخراج Spreadsheet ID"
+            )
+        }
+
+        // Test connectivity
+        val connResult = testConnection(publicUrl)
+        val isAccessible = connResult.isSuccess
+        val statusMsg = connResult.getOrElse { it.message ?: "فشل الاتصال" }
+
+        // Discover sheets
+        val sheetsResult = discoverSheets(publicUrl)
+        val sheets = sheetsResult.getOrDefault(emptyList())
+
+        var sampleHeaders = emptyList<String>()
+        var sampleRowCount = 0
+
+        if (isAccessible && sheets.isNotEmpty()) {
+            val firstSheet = sheets.first()
+            val readResult = readSheetData(publicUrl, firstSheet.sheetName, firstSheet.sheetId)
+            readResult.onSuccess {
+                sampleHeaders = it.detectedHeaders
+                sampleRowCount = it.rowCount
+            }
+        }
+
+        SpreadsheetDiagnosticReport(
+            spreadsheetId = spreadsheetId,
+            isAccessible = isAccessible,
+            isReadOnly = true,
+            accessMode = "المصدر للقراءة فقط (READ-ONLY) - التعديل المباشر يتطلب صلاحيات API خاصة",
+            statusMessage = statusMsg,
+            discoveredSheets = sheets,
+            sampleHeaders = sampleHeaders,
+            sampleRowCount = sampleRowCount
+        )
     }
 }

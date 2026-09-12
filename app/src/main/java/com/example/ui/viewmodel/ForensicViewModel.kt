@@ -10,8 +10,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
 import com.example.data.local.entities.AuditLogEntity
+import com.example.data.local.entities.CaseAuditLogEntity
 import com.example.data.local.entities.CaseEntity
+import com.example.data.local.entities.CaseFinancialLogEntity
 import com.example.data.local.entities.CaseLinkedItemEntity
+import com.example.data.local.entities.CasePaymentEntity
 import com.example.data.local.entities.ClientEntity
 import com.example.data.local.entities.ContentEntity
 import com.example.data.local.entities.EvidenceEntity
@@ -22,6 +25,8 @@ import com.example.data.local.entities.InvestigationToolEntity
 import com.example.data.local.entities.KnowledgeEntity
 import com.example.data.local.entities.SupportFormEntity
 import com.example.data.local.entities.TaskEntity
+import com.example.data.local.entities.VideoIdeaEntity
+import com.example.data.local.entities.VideoScriptEntity
 import com.example.data.remote.SheetReadResult
 import com.example.data.repository.ExternalRequestsRepository
 import com.example.data.repository.ForensicRepository
@@ -46,9 +51,11 @@ data class GlobalSearchResults(
     val knowledge: List<KnowledgeEntity> = emptyList(),
     val tasks: List<TaskEntity> = emptyList(),
     val supportForms: List<SupportFormEntity> = emptyList(),
-    val investigationTools: List<InvestigationToolEntity> = emptyList()
+    val investigationTools: List<InvestigationToolEntity> = emptyList(),
+    val videoIdeas: List<VideoIdeaEntity> = emptyList(),
+    val videoScripts: List<VideoScriptEntity> = emptyList()
 ) {
-    val totalCount: Int get() = cases.size + clients.size + evidence.size + content.size + knowledge.size + tasks.size + supportForms.size + investigationTools.size
+    val totalCount: Int get() = cases.size + clients.size + evidence.size + content.size + knowledge.size + tasks.size + supportForms.size + investigationTools.size + videoIdeas.size + videoScripts.size
 }
 
 
@@ -64,6 +71,19 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
 
     private val _isBiometricUnlocked = MutableStateFlow(true)
     val isBiometricUnlocked = _isBiometricUnlocked.asStateFlow()
+
+    // App Security & Lock Settings
+    private val _isLockEnabled = MutableStateFlow(true)
+    val isLockEnabled = _isLockEnabled.asStateFlow()
+
+    private val _appPin = MutableStateFlow("1234")
+    val appPin = _appPin.asStateFlow()
+
+    private val _autoLockInterval = MutableStateFlow("IMMEDIATE") // IMMEDIATE, 1_MIN, 5_MIN, 15_MIN, NEVER
+    val autoLockInterval = _autoLockInterval.asStateFlow()
+
+    private val _isBiometricHardwareEnabled = MutableStateFlow(true)
+    val isBiometricHardwareEnabled = _isBiometricHardwareEnabled.asStateFlow()
 
     // Theme & Security Settings
     private val _isDarkTheme = MutableStateFlow(true)
@@ -102,6 +122,21 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     val taskSearchQuery = MutableStateFlow("")
     val taskStatusFilter = MutableStateFlow("الكل")
     val taskPriorityFilter = MutableStateFlow("الكل")
+
+    // Payment & Ledger Filters
+    val paymentSearchQuery = MutableStateFlow("")
+    val paymentStatusFilter = MutableStateFlow("الكل") // الكل, غير مدفوع, مدفوع جزئيًا, مدفوع بالكامل, معفى
+    val paymentMethodFilter = MutableStateFlow("الكل")
+
+    // Video Ideas & Scripts Filters
+    val videoIdeaSearchQuery = MutableStateFlow("")
+    val videoIdeaStatusFilter = MutableStateFlow("الكل")
+    val videoIdeaPlatformFilter = MutableStateFlow("الكل")
+    val videoIdeaTypeFilter = MutableStateFlow("الكل")
+    val videoIdeaPriorityFilter = MutableStateFlow("الكل")
+
+    val videoScriptSearchQuery = MutableStateFlow("")
+    val videoScriptStatusFilter = MutableStateFlow("الكل")
 
     val globalSearchQuery = MutableStateFlow("")
 
@@ -148,6 +183,25 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
             if (savedSec != null) {
                 _isScreenshotProtection.value = (savedSec == "true")
             }
+            val savedLock = repository.getSetting("security_lock_enabled")
+            if (savedLock != null) {
+                _isLockEnabled.value = (savedLock == "true")
+            }
+            val savedPin = repository.getSetting("security_app_pin")
+            if (!savedPin.isNullOrBlank()) {
+                _appPin.value = savedPin
+            }
+            val savedInterval = repository.getSetting("security_auto_lock")
+            if (!savedInterval.isNullOrBlank()) {
+                _autoLockInterval.value = savedInterval
+            }
+            val savedBio = repository.getSetting("security_biometric_enabled")
+            if (savedBio != null) {
+                _isBiometricHardwareEnabled.value = (savedBio == "true")
+            }
+            if (_isLockEnabled.value) {
+                _isBiometricUnlocked.value = false
+            }
         }
     }
 
@@ -160,6 +214,10 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     val rawTasks = repository.allTasks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val rawSupportForms = repository.allSupportForms.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val rawInvestigationTools = repository.allInvestigationTools.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val rawPayments = repository.allPayments.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val rawFinancialLogs = repository.allFinancialLogs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val rawVideoIdeas = repository.allVideoIdeas.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val rawVideoScripts = repository.allVideoScripts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val auditLogs = repository.recentAuditLogs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val isCloudSyncing = repository.isCloudSyncing
@@ -259,6 +317,63 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Filtered Video Ideas Stream
+    val filteredVideoIdeas: StateFlow<List<VideoIdeaEntity>> = combine(
+        rawVideoIdeas,
+        videoIdeaSearchQuery,
+        videoIdeaStatusFilter,
+        videoIdeaPlatformFilter,
+        videoIdeaTypeFilter
+    ) { ideas, query, status, platform, type ->
+        val q = query.trim()
+        ideas.filter { idea ->
+            val matchesQ = q.isBlank() ||
+                    idea.title.contains(q, ignoreCase = true) ||
+                    idea.concept.contains(q, ignoreCase = true) ||
+                    idea.hook.contains(q, ignoreCase = true) ||
+                    idea.keyPoints.contains(q, ignoreCase = true)
+            val matchesStatus = status == "الكل" || idea.status == status
+            val matchesPlatform = platform == "الكل" || idea.platform == platform
+            val matchesType = type == "الكل" || idea.contentType == type
+            matchesQ && matchesStatus && matchesPlatform && matchesType
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Filtered Video Scripts Stream
+    val filteredVideoScripts: StateFlow<List<VideoScriptEntity>> = combine(
+        rawVideoScripts,
+        videoScriptSearchQuery,
+        videoScriptStatusFilter
+    ) { scripts, query, status ->
+        val q = query.trim()
+        scripts.filter { script ->
+            val matchesQ = q.isBlank() ||
+                    script.title.contains(q, ignoreCase = true) ||
+                    script.hook.contains(q, ignoreCase = true) ||
+                    script.mainContent.contains(q, ignoreCase = true) ||
+                    script.callToAction.contains(q, ignoreCase = true)
+            val matchesStatus = status == "الكل" || script.status == status
+            matchesQ && matchesStatus
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Filtered Payments Stream
+    val filteredPayments: StateFlow<List<CasePaymentEntity>> = combine(
+        rawPayments,
+        paymentSearchQuery,
+        paymentMethodFilter
+    ) { payments, query, method ->
+        val q = query.trim()
+        payments.filter { payment ->
+            val matchesQ = q.isBlank() ||
+                    payment.caseNumber.contains(q, ignoreCase = true) ||
+                    payment.notes.contains(q, ignoreCase = true) ||
+                    payment.receiptNumber.contains(q, ignoreCase = true)
+            val matchesMethod = method == "الكل" || payment.paymentMethod == method
+            matchesQ && matchesMethod
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Global Search Engine Stream
     val searchResults: StateFlow<GlobalSearchResults> = combine(
         globalSearchQuery,
@@ -288,6 +403,8 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
         val supportForms = args[7] as List<SupportFormEntity>
         @Suppress("UNCHECKED_CAST")
         val investigationTools = args[8] as List<InvestigationToolEntity>
+        val ideas = rawVideoIdeas.value
+        val scripts = rawVideoScripts.value
 
         val query = q.trim()
         if (query.isBlank()) {
@@ -301,7 +418,9 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
                 knowledge = knowledge.filter { it.title.contains(query, ignoreCase = true) || it.summary.contains(query, ignoreCase = true) || it.content.contains(query, ignoreCase = true) },
                 tasks = tasks.filter { it.title.contains(query, ignoreCase = true) || it.description.contains(query, ignoreCase = true) },
                 supportForms = supportForms.filter { it.formName.contains(query, ignoreCase = true) || it.company.contains(query, ignoreCase = true) || it.problemType.contains(query, ignoreCase = true) },
-                investigationTools = investigationTools.filter { it.name.contains(query, ignoreCase = true) || it.description.contains(query, ignoreCase = true) || it.category.contains(query, ignoreCase = true) }
+                investigationTools = investigationTools.filter { it.name.contains(query, ignoreCase = true) || it.description.contains(query, ignoreCase = true) || it.category.contains(query, ignoreCase = true) },
+                videoIdeas = ideas.filter { it.title.contains(query, ignoreCase = true) || it.concept.contains(query, ignoreCase = true) },
+                videoScripts = scripts.filter { it.title.contains(query, ignoreCase = true) || it.mainContent.contains(query, ignoreCase = true) }
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GlobalSearchResults())
@@ -458,17 +577,109 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleBiometricLock() {
+        if (!_isLockEnabled.value) {
+            showHud("نظام قفل التطبيق معطل في الإعدادات", HudType.INFO)
+            return
+        }
         val newState = !_isBiometricUnlocked.value
         _isBiometricUnlocked.value = newState
         showHud(
-            if (newState) "تم إلغاء القفل الحيوي بنجاح" else "تم تأمين المنصة بالقفل الحيوي",
+            if (newState) "تم إلغاء القفل بنجاح" else "تم تأمين المنصة بالقفل",
             HudType.SUCCESS
         )
     }
 
     fun lockBiometrics() {
-        _isBiometricUnlocked.value = false
-        showHud("تم تأمين المنصة بالقفل الحيوي", HudType.INFO)
+        if (_isLockEnabled.value) {
+            _isBiometricUnlocked.value = false
+            showHud("تم تأمين المنصة بالقفل", HudType.INFO)
+        }
+    }
+
+    fun unlockBiometrics() {
+        _isBiometricUnlocked.value = true
+        showHud("تم إلغاء القفل عبر المصادقة الحيوية", HudType.SUCCESS)
+    }
+
+    fun verifyPin(inputPin: String): Boolean {
+        return if (inputPin == _appPin.value) {
+            _isBiometricUnlocked.value = true
+            showHud("تم فتح المنصة بنجاح بواسطة رمز PIN", HudType.SUCCESS)
+            true
+        } else {
+            showHud("رمز PIN غير صحيح. يرجى المحاولة ثانية.", HudType.ERROR)
+            false
+        }
+    }
+
+    fun changePin(oldPin: String, newPin: String): Pair<Boolean, String> {
+        if (oldPin != _appPin.value) {
+            return Pair(false, "رمز PIN الحالي غير صحيح")
+        }
+        if (newPin.length !in 4..6 || !newPin.all { it.isDigit() }) {
+            return Pair(false, "يجب أن يتكون رمز PIN الجديد من 4 إلى 6 أرقام")
+        }
+        _appPin.value = newPin
+        viewModelScope.launch {
+            repository.saveSetting("security_app_pin", newPin)
+            repository.logAudit(
+                actionType = "SECURITY",
+                module = "SETTINGS",
+                entityId = "app_pin",
+                performedBy = _currentRole.value,
+                details = "تم تغيير رمز PIN السري للمنصة"
+            )
+        }
+        showHud("تم تحديث رمز PIN الجديد بنجاح", HudType.SUCCESS)
+        return Pair(true, "تم تحديث الرمز بنجاح")
+    }
+
+    fun setLockEnabled(enabled: Boolean) {
+        _isLockEnabled.value = enabled
+        if (!enabled) {
+            _isBiometricUnlocked.value = true
+        }
+        viewModelScope.launch {
+            repository.saveSetting("security_lock_enabled", enabled.toString())
+        }
+        showHud(if (enabled) "تم تفعيل نظام قفل التطبيق" else "تم تعطيل نظام قفل التطبيق", HudType.INFO)
+    }
+
+    fun setAutoLockInterval(interval: String) {
+        _autoLockInterval.value = interval
+        viewModelScope.launch {
+            repository.saveSetting("security_auto_lock", interval)
+        }
+        val label = when (interval) {
+            "IMMEDIATE" -> "فوري عند مغادرة التطبيق"
+            "1_MIN" -> "بعد دقيقة واحدة"
+            "5_MIN" -> "بعد 5 دقائق"
+            "15_MIN" -> "بعد 15 دقيقة"
+            else -> "إيقاف القفل التلقائي"
+        }
+        showHud("تم تعيين القفل التلقائي: $label", HudType.INFO)
+    }
+
+    fun setBiometricHardwareEnabled(enabled: Boolean) {
+        _isBiometricHardwareEnabled.value = enabled
+        viewModelScope.launch {
+            repository.saveSetting("security_biometric_enabled", enabled.toString())
+        }
+        showHud(if (enabled) "تم تفعيل المستشعر الحيوي" else "تم تعطيل المستشعر الحيوي", HudType.INFO)
+    }
+
+    fun checkAutoLockOnResume(elapsedMillis: Long) {
+        if (!_isLockEnabled.value) return
+        val thresholdMillis = when (_autoLockInterval.value) {
+            "IMMEDIATE" -> 1500L // 1.5s tolerance
+            "1_MIN" -> 60_000L
+            "5_MIN" -> 300_000L
+            "15_MIN" -> 900_000L
+            else -> Long.MAX_VALUE
+        }
+        if (elapsedMillis >= thresholdMillis) {
+            _isBiometricUnlocked.value = false
+        }
     }
 
     // ==========================================
@@ -499,6 +710,129 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
             )
         }
     }
+
+    fun addCasePayment(
+        caseId: String,
+        amount: Double,
+        paymentMethod: String,
+        paymentDate: String,
+        notes: String,
+        receiptNumber: String = ""
+    ) {
+        viewModelScope.launch {
+            val res = repository.addCasePayment(
+                caseId = caseId,
+                amount = amount,
+                paymentMethod = paymentMethod,
+                paymentDate = paymentDate,
+                notes = notes,
+                receiptNumber = receiptNumber,
+                performedBy = _currentRole.value
+            )
+            if (res.isSuccess) {
+                showHud("تم تسجيل الدفعة المالية بقيمة $amount بنجاح", HudType.SUCCESS)
+            } else {
+                showHud("فشل تسجيل الدفعة: ${res.exceptionOrNull()?.message}", HudType.ERROR)
+            }
+        }
+    }
+
+    fun updateCasePrice(caseId: String, newPrice: Double, notes: String) {
+        viewModelScope.launch {
+            val res = repository.updateCasePrice(
+                caseId = caseId,
+                newPrice = newPrice,
+                notes = notes,
+                performedBy = _currentRole.value
+            )
+            if (res.isSuccess) {
+                showHud("تم تعديل السعر بنجاح إلى $newPrice", HudType.SUCCESS)
+            } else {
+                showHud("فشل تعديل السعر: ${res.exceptionOrNull()?.message}", HudType.ERROR)
+            }
+        }
+    }
+
+    fun changeCaseStatus(caseId: String, newStatus: String) {
+        viewModelScope.launch {
+            repository.changeCaseStatus(caseId, newStatus, performedBy = _currentRole.value)
+            showHud("تم تغيير حالة القضية إلى: $newStatus", HudType.INFO)
+        }
+    }
+
+    fun changeCasePriority(caseId: String, newPriority: String) {
+        viewModelScope.launch {
+            repository.changeCasePriority(caseId, newPriority, performedBy = _currentRole.value)
+            showHud("تم تعديل أولوية القضية إلى: $newPriority", HudType.INFO)
+        }
+    }
+
+    fun closeCase(caseId: String, reason: String = "") {
+        viewModelScope.launch {
+            repository.closeCase(caseId, reason, performedBy = _currentRole.value)
+            showHud("تم إغلاق القضية بنجاح", HudType.SUCCESS)
+        }
+    }
+
+    fun reopenCase(caseId: String) {
+        viewModelScope.launch {
+            repository.reopenCase(caseId, performedBy = _currentRole.value)
+            showHud("تمت إعادة فتح القضية للمتابعة", HudType.INFO)
+        }
+    }
+
+    fun archiveCase(caseId: String) {
+        viewModelScope.launch {
+            repository.archiveCase(caseId, performedBy = _currentRole.value)
+            showHud("تمت أرشفة القضية بنجاح", HudType.INFO)
+        }
+    }
+
+    fun duplicateCase(sourceCaseId: String) {
+        viewModelScope.launch {
+            val res = repository.duplicateCase(sourceCaseId, performedBy = _currentRole.value)
+            if (res.isSuccess) {
+                showHud("تم استنساخ القضية بنجاح (${res.getOrNull()?.caseNumber})", HudType.SUCCESS)
+            } else {
+                showHud("فشل استنساخ القضية: ${res.exceptionOrNull()?.message}", HudType.ERROR)
+            }
+        }
+    }
+
+    fun getPaymentsForCase(caseId: String) = repository.getPaymentsForCase(caseId)
+    fun getCaseAuditLogs(caseId: String) = repository.getCaseAuditLogs(caseId)
+    fun getCaseFinancialLogs(caseId: String) = repository.getCaseFinancialLogs(caseId)
+
+    // Video Ideas & Scripts Actions
+    fun saveVideoIdea(idea: VideoIdeaEntity, isNew: Boolean) {
+        viewModelScope.launch {
+            repository.insertOrUpdateVideoIdea(idea, isNew)
+            showHud(if (isNew) "تم حفظ فكرة الفيديو الجديدة" else "تم تحديث فكرة الفيديو", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteVideoIdea(idea: VideoIdeaEntity) {
+        viewModelScope.launch {
+            repository.softDeleteVideoIdea(idea.id, idea.title)
+            showHud("تم حذف فكرة الفيديو بنجاح", HudType.WARNING)
+        }
+    }
+
+    fun saveVideoScript(script: VideoScriptEntity, isNew: Boolean) {
+        viewModelScope.launch {
+            repository.insertOrUpdateVideoScript(script, isNew)
+            showHud(if (isNew) "تم حفظ سكربت الفيديو بنجاح" else "تم تحديث سكربت الفيديو", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteVideoScript(script: VideoScriptEntity) {
+        viewModelScope.launch {
+            repository.softDeleteVideoScript(script.id, script.title)
+            showHud("تم حذف سكربت الفيديو بنجاح", HudType.WARNING)
+        }
+    }
+
+    fun getScriptsForIdea(ideaId: String) = repository.getScriptsForIdea(ideaId)
 
     // ==========================================
     // CLIENTS ACTIONS
@@ -923,14 +1257,15 @@ $sectionNumber التوصية الفنية والإجرائية:
     // EXTERNAL REQUESTS ACTIONS (طلبات العملاء الخارجية)
     // ==========================================
 
-    fun testExternalSourceConnection(url: String, onResult: (Boolean, String) -> Unit) {
+    fun testExternalSourceConnection(url: String, onResult: (Boolean, String, String) -> Unit) {
         viewModelScope.launch {
             val result = externalRequestsRepo.testConnection(url)
+            val docTitle = externalRequestsRepo.extractDocumentTitle(url)
             if (result.isSuccess) {
-                onResult(true, result.getOrNull() ?: "تم الاتصال بالملف العام بنجاح.")
+                onResult(true, result.getOrNull() ?: "تم الاتصال بالملف العام بنجاح.", docTitle)
             } else {
                 val errorMsg = result.exceptionOrNull()?.localizedMessage ?: "فشل الاتصال بالملف."
-                onResult(false, errorMsg)
+                onResult(false, errorMsg, "")
             }
         }
     }

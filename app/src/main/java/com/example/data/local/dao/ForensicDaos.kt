@@ -283,4 +283,106 @@ interface CaseLinkedItemDao {
     suspend fun deleteByCaseAndItem(caseId: String, itemId: String)
 }
 
+@Dao
+interface CasePaymentDao {
+    @Query("SELECT * FROM case_payments WHERE caseId = :caseId ORDER BY createdDate DESC")
+    fun getPaymentsForCase(caseId: String): Flow<List<com.example.data.local.entities.CasePaymentEntity>>
+
+    @Query("SELECT * FROM case_payments ORDER BY createdDate DESC")
+    fun getAllPayments(): Flow<List<com.example.data.local.entities.CasePaymentEntity>>
+
+    @Query("SELECT * FROM case_payments ORDER BY createdDate DESC LIMIT :limit")
+    fun getRecentPayments(limit: Int = 50): Flow<List<com.example.data.local.entities.CasePaymentEntity>>
+
+    @Query("SELECT SUM(amount) FROM case_payments WHERE caseId = :caseId")
+    suspend fun getTotalPaidForCase(caseId: String): Double?
+
+    @Query("SELECT SUM(amount) FROM case_payments")
+    fun getTotalPaidAcrossAllCases(): Flow<Double?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(payment: com.example.data.local.entities.CasePaymentEntity)
+
+    @Query("DELETE FROM case_payments WHERE id = :id")
+    suspend fun deleteById(id: String)
+}
+
+@Dao
+interface CaseFinancialLogDao {
+    @Query("SELECT * FROM case_financial_logs WHERE caseId = :caseId ORDER BY timestamp DESC")
+    fun getLogsForCase(caseId: String): Flow<List<com.example.data.local.entities.CaseFinancialLogEntity>>
+
+    @Query("SELECT * FROM case_financial_logs ORDER BY timestamp DESC")
+    fun getAllFinancialLogs(): Flow<List<com.example.data.local.entities.CaseFinancialLogEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(log: com.example.data.local.entities.CaseFinancialLogEntity)
+}
+
+@Dao
+interface CaseAuditLogDao {
+    @Query("SELECT * FROM case_audit_logs WHERE caseId = :caseId ORDER BY timestamp DESC")
+    fun getLogsForCase(caseId: String): Flow<List<com.example.data.local.entities.CaseAuditLogEntity>>
+
+    @Query("SELECT * FROM case_audit_logs ORDER BY timestamp DESC LIMIT :limit")
+    fun getRecentLogs(limit: Int = 100): Flow<List<com.example.data.local.entities.CaseAuditLogEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(log: com.example.data.local.entities.CaseAuditLogEntity)
+}
+
+@Dao
+interface VideoIdeaDao {
+    @Query("SELECT * FROM video_ideas WHERE isDeleted = 0 ORDER BY updatedDate DESC")
+    fun getAllActiveIdeas(): Flow<List<com.example.data.local.entities.VideoIdeaEntity>>
+
+    @Query("SELECT * FROM video_ideas WHERE isDeleted = 0 AND status = :status ORDER BY updatedDate DESC")
+    fun getIdeasByStatus(status: String): Flow<List<com.example.data.local.entities.VideoIdeaEntity>>
+
+    @Query("SELECT * FROM video_ideas WHERE isDeleted = 1 ORDER BY deletedAt DESC")
+    fun getDeletedIdeas(): Flow<List<com.example.data.local.entities.VideoIdeaEntity>>
+
+    @Query("SELECT * FROM video_ideas WHERE id = :id LIMIT 1")
+    suspend fun getIdeaById(id: String): com.example.data.local.entities.VideoIdeaEntity?
+
+    @Query("SELECT COUNT(*) FROM video_ideas WHERE isDeleted = 0")
+    suspend fun getCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(idea: com.example.data.local.entities.VideoIdeaEntity)
+
+    @Query("UPDATE video_ideas SET isDeleted = 1, deletedAt = :deletedAt, syncStatus = 'PENDING_SYNC' WHERE id = :id")
+    suspend fun softDelete(id: String, deletedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE video_ideas SET isDeleted = 0, deletedAt = NULL, syncStatus = 'PENDING_SYNC' WHERE id = :id")
+    suspend fun restore(id: String)
+
+    @Query("DELETE FROM video_ideas WHERE id = :id")
+    suspend fun permanentDelete(id: String)
+}
+
+@Dao
+interface VideoScriptDao {
+    @Query("SELECT * FROM video_scripts WHERE isDeleted = 0 ORDER BY updatedDate DESC")
+    fun getAllActiveScripts(): Flow<List<com.example.data.local.entities.VideoScriptEntity>>
+
+    @Query("SELECT * FROM video_scripts WHERE ideaId = :ideaId AND isDeleted = 0 ORDER BY updatedDate DESC")
+    fun getScriptsForIdea(ideaId: String): Flow<List<com.example.data.local.entities.VideoScriptEntity>>
+
+    @Query("SELECT * FROM video_scripts WHERE id = :id LIMIT 1")
+    suspend fun getScriptById(id: String): com.example.data.local.entities.VideoScriptEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(script: com.example.data.local.entities.VideoScriptEntity)
+
+    @Query("UPDATE video_scripts SET isDeleted = 1, deletedAt = :deletedAt, syncStatus = 'PENDING_SYNC' WHERE id = :id")
+    suspend fun softDelete(id: String, deletedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE video_scripts SET isDeleted = 0, deletedAt = NULL, syncStatus = 'PENDING_SYNC' WHERE id = :id")
+    suspend fun restore(id: String)
+
+    @Query("DELETE FROM video_scripts WHERE id = :id")
+    suspend fun permanentDelete(id: String)
+}
+
 
