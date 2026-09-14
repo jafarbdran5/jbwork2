@@ -20,8 +20,14 @@ interface AppSectionConfigDao {
     @Query("SELECT * FROM app_section_configs WHERE isVisible = 1 ORDER BY sortOrder ASC")
     fun getVisibleSections(): Flow<List<AppSectionConfigEntity>>
 
+    @Query("SELECT * FROM app_section_configs WHERE isVisible = 1 AND showInBottomNav = 1 ORDER BY bottomNavOrder ASC, sortOrder ASC")
+    fun getBottomNavSections(): Flow<List<AppSectionConfigEntity>>
+
     @Query("SELECT * FROM app_section_configs WHERE id = :id LIMIT 1")
     suspend fun getSectionById(id: String): AppSectionConfigEntity?
+
+    @Query("SELECT * FROM app_section_configs WHERE isDefaultStartScreen = 1 LIMIT 1")
+    suspend fun getDefaultStartScreen(): AppSectionConfigEntity?
 
     @Query("SELECT COUNT(*) FROM app_section_configs")
     suspend fun getCount(): Int
@@ -34,6 +40,12 @@ interface AppSectionConfigDao {
 
     @Query("UPDATE app_section_configs SET isVisible = :visible WHERE id = :id")
     suspend fun updateVisibility(id: String, visible: Boolean)
+
+    @Query("UPDATE app_section_configs SET showInBottomNav = :showInBottom, bottomNavOrder = :order WHERE id = :id")
+    suspend fun updateBottomNavConfig(id: String, showInBottom: Boolean, order: Int)
+
+    @Query("UPDATE app_section_configs SET isDefaultStartScreen = (CASE WHEN id = :id THEN 1 ELSE 0 END)")
+    suspend fun setDefaultStartScreen(id: String)
 
     @Query("UPDATE app_section_configs SET displayName = :name, description = :desc, iconName = :icon, sortOrder = :order, isVisible = :visible WHERE id = :id")
     suspend fun updateSection(id: String, name: String, desc: String, icon: String, order: Int, visible: Boolean)

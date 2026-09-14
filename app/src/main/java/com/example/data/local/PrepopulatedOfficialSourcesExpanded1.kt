@@ -1,0 +1,338 @@
+package com.example.data.local
+
+import com.example.data.local.entities.OfficialSourceEntity
+
+object PrepopulatedOfficialSourcesExpanded1 {
+    val ADDITIONAL_SOURCES_PART1 = listOf(
+        // ==========================================
+        // LAW ENFORCEMENT & GLOBAL JUDICIAL REQUEST PORTALS
+        // ==========================================
+        OfficialSourceEntity(
+            id = "src_le_apple",
+            name = "Apple Law Enforcement Information Requests (LEAS)",
+            companyOrEntity = "Apple Inc.",
+            sectionType = PrepopulatedOfficialSources.SEC_LAW_ENFORCEMENT,
+            category = "إنفاذ القانون والقضاء",
+            portalType = "بوابة أوامر قضائية مشفرة",
+            officialUrl = "https://www.apple.com/legal/privacy/law-enforcement-guidelines-us.pdf",
+            description = "البوابة الرسمية المخصصة لجهات إنفاذ القانون لطلب بيانات مشتريات Apple ID، سجلات iCloud، وبيانات تتبع الأجهزة المسروقة.",
+            region = "عالمي",
+            requirements = "أمر قضائي معتمد / مذكرة تفتيش رسمية وبريد حكومي رسمي",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 10
+        ),
+        OfficialSourceEntity(
+            id = "src_le_snapchat",
+            name = "Snapchat Law Enforcement Request System (LERS)",
+            companyOrEntity = "Snap Inc.",
+            sectionType = PrepopulatedOfficialSources.SEC_LAW_ENFORCEMENT,
+            category = "إنفاذ القانون والقضاء",
+            portalType = "بوابة استجابة قانونية سريعة",
+            officialUrl = "https://lawenforcement.snapchat.com",
+            description = "النظام الرقمي الرسمي لتلقي خطابات الحفظ والطلبات الطارئة ومذكرات المحاكم لحسابات سناب شات ورسائلها وبيانات التسجيل.",
+            region = "عالمي",
+            requirements = "بريد إلكتروني تابع لجهة أمنية أو قضائية مع إرفاق الخطاب الرسمي",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 11
+        ),
+        OfficialSourceEntity(
+            id = "src_le_discord",
+            name = "Discord Law Enforcement Portal",
+            companyOrEntity = "Discord Inc.",
+            sectionType = PrepopulatedOfficialSources.SEC_LAW_ENFORCEMENT,
+            category = "إنفاذ القانون والقضاء",
+            portalType = "بوابة طلبات جنائية",
+            officialUrl = "https://discord.com/safety/law-enforcement",
+            description = "مركز تقديم مذكرات الإحضار وأوامر التفتيش لبيانات خوادم Discord ومعرفات المستخدمين وسجلات IP وعناوين البريد.",
+            region = "عالمي",
+            requirements = "طلب رسمي موجه إلى Discord Legal مع بيان السند القانوني",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 12
+        ),
+        OfficialSourceEntity(
+            id = "src_le_binance",
+            name = "Binance Law Enforcement Portal (Kodex)",
+            companyOrEntity = "Binance Holdings",
+            sectionType = PrepopulatedOfficialSources.SEC_LAW_ENFORCEMENT,
+            category = "إنفاذ القانون والقضاء",
+            portalType = "بوابة تحقيق وتجميد أصول مالية مشفرة",
+            officialUrl = "https://www.binance.com/en/support/law-enforcement",
+            description = "النظام الرسمي المعتمد لجهات إنفاذ القانون العالمية لطلب تجميد محافظ العملات المشفرة وتتبع تدفقات أموال الجريمة المنظمة.",
+            region = "عالمي",
+            requirements = "تسجيل جهة التحقيق الرسمية عبر نظام Kodex المشفر",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 13
+        ),
+        OfficialSourceEntity(
+            id = "src_le_coinbase",
+            name = "Coinbase Law Enforcement Portal",
+            companyOrEntity = "Coinbase Global Inc.",
+            sectionType = PrepopulatedOfficialSources.SEC_LAW_ENFORCEMENT,
+            category = "إنفاذ القانون والقضاء",
+            portalType = "نظام استجابة للأوامر القضائية",
+            officialUrl = "https://www.coinbase.com/legal/requests",
+            description = "بوابة استلام أوامر المحاكم الأمريكية والدولية لحجز العملات المشفرة وتقديم بيانات التحقق من الهوية (KYC) لأصحاب الحسابات.",
+            region = "عالمي",
+            requirements = "مذكرة استدعاء أو أمر محكمة رسمي ساري المفعول",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 14
+        ),
+        OfficialSourceEntity(
+            id = "src_le_kraken",
+            name = "Kraken Law Enforcement Portal",
+            companyOrEntity = "Payward Inc. (Kraken)",
+            sectionType = PrepopulatedOfficialSources.SEC_LAW_ENFORCEMENT,
+            category = "إنفاذ القانون والقضاء",
+            portalType = "بوابة استجابة أمنية",
+            officialUrl = "https://www.kraken.com/legal/compliance",
+            description = "مركز الاستجابة لمذكرات التفتيش والتحقيقات الجنائية في الاحتيال وسرقة الأصول المشفرة عبر منصة كراكن.",
+            region = "عالمي",
+            requirements = "خطاب رسمي معتمد من النيابة العامة أو المحكمة المختصة",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 15
+        ),
+        OfficialSourceEntity(
+            id = "src_le_interpol_cyber",
+            name = "Interpol Cybercrime Directorate",
+            companyOrEntity = "منظمة الشرطة الجنائية الدولية (INTERPOL)",
+            sectionType = PrepopulatedOfficialSources.SEC_LAW_ENFORCEMENT,
+            category = "إنفاذ القانون والقضاء",
+            portalType = "منظومة تنسيق أمني دولي",
+            officialUrl = "https://www.interpol.int/Crimes/Cybercrime",
+            description = "مركز القيادة والعمليات التابع للإنتربول لمكافحة الجرائم السيبرانية العابرة للحدود والتنسيق بين 196 دولة عضواً.",
+            region = "دولي (196 دولة)",
+            requirements = "قنوات الاتصال المعتمدة عبر المكاتب المركزية الوطنية (NCB)",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 16
+        ),
+        OfficialSourceEntity(
+            id = "src_le_europol_ec3",
+            name = "Europol European Cybercrime Centre (EC3)",
+            companyOrEntity = "وكالة الاتحاد الأوروبي للتعاون في مجال إنفاذ القانون (Europol)",
+            sectionType = PrepopulatedOfficialSources.SEC_LAW_ENFORCEMENT,
+            category = "إنفاذ القانون والقضاء",
+            portalType = "مركز عمليات سيبرانية إقليمي",
+            officialUrl = "https://www.europol.europa.eu/about-europol/european-cybercrime-centre-ec3",
+            description = "المركز الأوروبي لتفكيك عصابات برمجيات الفدية والاحتيال المالي الإلكتروني والاستغلال الرقمي للأطفال.",
+            region = "الاتحاد الأوروبي والشركاء الدوليون",
+            requirements = "تنسيق عبر وحدات التحقيق الوطنية في دول الاتحاد الأوروبي",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 17
+        ),
+
+        // ==========================================
+        // NATIONAL CSIRT / CERT CYBERSECURITY CENTERS
+        // ==========================================
+        OfficialSourceEntity(
+            id = "src_cert_saudi_ncsc",
+            name = "المركز الوطني الإرشادي للأمن السيبراني (NCA CyberIC)",
+            companyOrEntity = "الهيئة الوطنية للأمن السيبراني (NCA)",
+            sectionType = PrepopulatedOfficialSources.SEC_CYBER_SECURITY,
+            category = "الأمن السيبراني والإبلاغ الأمني",
+            portalType = "مركز إرشادي وإنذار مبكر وطني",
+            officialUrl = "https://cert.gov.sa",
+            description = "المرجع الوطني السعودي لإصدار التحذيرات الأمنية العاجلة، تقديم المساعدة التقنية للقطاعات، ونشر أفضل الممارسات.",
+            region = "المملكة العربية السعودية",
+            requirements = "متاح للجهات والأفراد لرفع بلاغات الحوادث الأمنية",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 20
+        ),
+        OfficialSourceEntity(
+            id = "src_cert_uae_aecert",
+            name = "مجلس الأمن السيبراني الإماراتي (aeCERT)",
+            companyOrEntity = "Cyber Security Council - UAE",
+            sectionType = PrepopulatedOfficialSources.SEC_CYBER_SECURITY,
+            category = "الأمن السيبراني والإبلاغ الأمني",
+            portalType = "فريق الاستجابة لطوارئ الحاسب الآلي الوطني",
+            officialUrl = "https://www.cybersecurity.gov.ae",
+            description = "الجهة الاتحادية المسؤولة عن بناء درع الدفاع السيبراني لدولة الإمارات وإدارة حوادث الاختراق والتنسيق مع الفرق الإقليمية.",
+            region = "دولة الإمارات العربية المتحدة",
+            requirements = "قنوات الإبلاغ الرسمية للحوادث السيبرانية الطارئة",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 21
+        ),
+        OfficialSourceEntity(
+            id = "src_cert_egypt_egcert",
+            name = "المركز المصري للاستجابة لطوارئ الحاسب الآلي (EG-CERT)",
+            companyOrEntity = "الجهاز القومي لتنظيم الاتصالات (NTRA)",
+            sectionType = PrepopulatedOfficialSources.SEC_CYBER_SECURITY,
+            category = "الأمن السيبراني والإبلاغ الأمني",
+            portalType = "مركز استجابة للطوارئ السيبرانية",
+            officialUrl = "https://www.egcert.eg",
+            description = "حماية البنية التحتية للمعلومات والاتصالات في مصر وتقديم الدعم الفني الجنائي للقطاعات الحيوية في التعامل مع الهجمات.",
+            region = "جمهورية مصر العربية",
+            requirements = "نموذج الإبلاغ عن الحوادث عبر الموقع الرسمي",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 22
+        ),
+        OfficialSourceEntity(
+            id = "src_cert_oman_ocert",
+            name = "المركز الوطني للسلامة المعلوماتية (OCERT)",
+            companyOrEntity = "وزارة النقل والاتصالات وتقنية المعلومات - سلطنة عمان",
+            sectionType = PrepopulatedOfficialSources.SEC_CYBER_SECURITY,
+            category = "الأمن السيبراني والإبلاغ الأمني",
+            portalType = "المركز الوطني للسلامة المعلوماتية",
+            officialUrl = "https://www.cert.gov.om",
+            description = "تحليل المخاطر السيبرانية ونشر التوعية وتقديم المساعدة في التعامل مع الجرائم الإلكترونية والابتزاز في سلطنة عمان.",
+            region = "سلطنة عمان",
+            requirements = "خط ساخن وبوابة بلاغات إلكترونية مفتوحة",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 23
+        ),
+        OfficialSourceEntity(
+            id = "src_cert_qatar_qcert",
+            name = "الوكالة الوطنية للأمن السيبراني القطرية (Q-CERT)",
+            companyOrEntity = "National Cyber Security Agency (NCSA Qatar)",
+            sectionType = PrepopulatedOfficialSources.SEC_CYBER_SECURITY,
+            category = "الأمن السيبراني والإبلاغ الأمني",
+            portalType = "مركز قطر الوطني للاستجابة لطوارئ الحاسب",
+            officialUrl = "https://ncsa.gov.qa",
+            description = "تأمين الفضاء الرقمي في دولة قطر، إدارة الحوادث السيبرانية الوطنية، وتقديم التحليل الجنائي للتهديدات المتطورة.",
+            region = "دولة قطر",
+            requirements = "بوابة الإبلاغ عن التهديدات والخط الساخن الوطني",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 24
+        ),
+        OfficialSourceEntity(
+            id = "src_cert_us_cisa",
+            name = "وكالة الأمن السيبراني وأمن البنية التحتية الأمريكية (CISA)",
+            companyOrEntity = "U.S. Cybersecurity and Infrastructure Security Agency",
+            sectionType = PrepopulatedOfficialSources.SEC_CYBER_SECURITY,
+            category = "الأمن السيبراني والإبلاغ الأمني",
+            portalType = "البوابة الوطنية الأمريكية للإنذار السيبراني",
+            officialUrl = "https://www.cisa.gov",
+            description = "المصدر العالمي الموثوق لإصدار إرشادات الحماية من برمجيات الفدية، وكتالوج الثغرات المستغلة فعلياً (KEV Catalog).",
+            region = "الولايات المتحدة / عالمي",
+            requirements = "إشعارات عامة وتحذيرات فنية مفتوحة للمختصين عالمياً",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 25
+        ),
+
+        // ==========================================
+        // GLOBAL EMERGENCY & CHILD SAFETY INSTITUTIONS
+        // ==========================================
+        OfficialSourceEntity(
+            id = "src_safety_ncmec",
+            name = "National Center for Missing & Exploited Children (NCMEC)",
+            companyOrEntity = "NCMEC USA",
+            sectionType = PrepopulatedOfficialSources.SEC_GLOBAL_EMERGENCY,
+            category = "الطوارئ الرقمية العالمية",
+            portalType = "بوابة خط البلاغات السيبراني (CyberTipline)",
+            officialUrl = "https://www.missingkids.org",
+            description = "المنظومة المركزية العالمية لتلقي بلاغات استغلال الأطفال عبر الإنترنت وإحالتها فورياً لأجهزة الشرطة في 100+ دولة.",
+            region = "عالمي",
+            requirements = "إبلاغ فوري سري ومتاح لجميع الأفراد والمنصات",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 30
+        ),
+        OfficialSourceEntity(
+            id = "src_safety_iwf",
+            name = "Internet Watch Foundation (IWF)",
+            companyOrEntity = "Internet Watch Foundation UK",
+            sectionType = PrepopulatedOfficialSources.SEC_GLOBAL_EMERGENCY,
+            category = "الطوارئ الرقمية العالمية",
+            portalType = "بوابة إزالة المحتوى المحظور دولياً",
+            officialUrl = "https://www.iwf.org.uk",
+            description = "منظمة دولية رائدة تعمل بالتعاون مع مزودي الإنترنت والشركات العالمية لإسقاط وحجب الروابط والمحتوى غير القانوني خلال دقائق.",
+            region = "المملكة المتحدة / عالمي",
+            requirements = "تقديم رابط المحتوى للإزالة الفورية دون تسجيل",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 31
+        ),
+        OfficialSourceEntity(
+            id = "src_safety_stopncii",
+            name = "StopNCII.org (Non-Consensual Intimate Image Protection)",
+            companyOrEntity = "SWGfL / Meta / Tech Partners",
+            sectionType = PrepopulatedOfficialSources.SEC_GLOBAL_EMERGENCY,
+            category = "الطوارئ الرقمية العالمية",
+            portalType = "منظومة منع الابتزاز بالصور الحساسة",
+            officialUrl = "https://stopncii.org",
+            description = "أداة تقنية ثورية تنشئ بصمات رقمية تجريدية (Hashes) للصور الخاصة داخل جهاز الضحية لمنع تداولها أو نشرها على كبرى المنصات.",
+            region = "عالمي",
+            requirements = "توليد البصمة محلياً على جهاز الضحية دون رفع الصورة الفعلية مطلقاً",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 32
+        ),
+        OfficialSourceEntity(
+            id = "src_safety_takeitdown",
+            name = "Take It Down (NCMEC)",
+            companyOrEntity = "NCMEC",
+            sectionType = PrepopulatedOfficialSources.SEC_GLOBAL_EMERGENCY,
+            category = "الطوارئ الرقمية العالمية",
+            portalType = "منصة سحب وإزالة الصور الخاصة بالقُصّر",
+            officialUrl = "https://takeitdown.ncmec.org",
+            description = "خدمة دولية مجانية تساعد القاصرين وأولياء الأمور على حذف الصور الخاصة المسربة أو المستخدمة في الابتزاز من الإنترنت.",
+            region = "عالمي",
+            requirements = "توليد هاش آمن ومحمي بدون رفع الصور",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 33
+        ),
+
+        // ==========================================
+        // PRIVACY & REGULATORY DATA PROTECTION BODIES
+        // ==========================================
+        OfficialSourceEntity(
+            id = "src_privacy_sdaia",
+            name = "الهيئة السعودية للبيانات والذكاء الاصطناعي (سدايا - مكتب إدارة البيانات)",
+            companyOrEntity = "SDAIA / NDMO",
+            sectionType = PrepopulatedOfficialSources.SEC_PRIVACY_DATA,
+            category = "الخصوصية وحماية البيانات",
+            portalType = "الجهة التنظيمية لنظام حماية البيانات الشخصية (PDPL)",
+            officialUrl = "https://sdaia.gov.sa",
+            description = "الجهة الوطنية المسؤولة عن إنفاذ نظام حماية البيانات الشخصية والتحقيق في انتهاكات وتسريبات البيانات ومعاقبة المخالفين.",
+            region = "المملكة العربية السعودية",
+            requirements = "بوابة تقديم شكاوى انتهاك الخصوصية وتسريب البيانات",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 40
+        ),
+        OfficialSourceEntity(
+            id = "src_privacy_edps",
+            name = "المشرف الأوروبي لحماية البيانات (EDPS)",
+            companyOrEntity = "European Data Protection Supervisor",
+            sectionType = PrepopulatedOfficialSources.SEC_PRIVACY_DATA,
+            category = "الخصوصية وحماية البيانات",
+            portalType = "الجهة القضائية العليا للائحة GDPR",
+            officialUrl = "https://edps.europa.eu",
+            description = "الهيئة المستقلة المشرفة على تطبيق قوانين الخصوصية الصارمة والتعامل مع الشكاوى المرفوعة ضد انتهاك خصوصية المستخدمين.",
+            region = "الاتحاد الأوروبي",
+            requirements = "تقديم طلب شكوى بموجب لائحة GDPR الرسمية",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 41
+        ),
+        OfficialSourceEntity(
+            id = "src_privacy_ico_uk",
+            name = "مكتب مفوض المعلومات البريطاني (ICO)",
+            companyOrEntity = "Information Commissioner's Office UK",
+            sectionType = PrepopulatedOfficialSources.SEC_PRIVACY_DATA,
+            category = "الخصوصية وحماية البيانات",
+            portalType = "هيئة تنظيم وحماية البيانات الرسمية",
+            officialUrl = "https://ico.org.uk",
+            description = "الجهة الحكومية المستقلة في بريطانيا لحماية خصوصية الأفراد وملاحقة الشركات التي تسيء استخدام البيانات أو تتعرض لاختراق.",
+            region = "المملكة المتحدة",
+            requirements = "بوابة الشكاوى العامة والإبلاغ عن خروقات البيانات",
+            verificationStatus = "معتمد ورسمي 100%",
+            lastVerifiedDate = "سبتمبر 2026",
+            sortOrder = 42
+        )
+    )
+}

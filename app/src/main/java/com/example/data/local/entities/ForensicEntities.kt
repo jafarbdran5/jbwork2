@@ -312,4 +312,56 @@ data class VideoScriptEntity(
     val syncStatus: String = "SYNCED"
 )
 
+@Entity(tableName = "case_custom_links")
+data class CaseCustomLinkEntity(
+    @PrimaryKey val id: String,
+    val caseId: String,
+    val caseNumber: String,
+    val title: String,
+    val url: String,
+    val linkType: String = "رابط خارجي", // حساب, صفحة, منشور, فيديو, صورة, مجموعة, قناة, موقع, رابط دعم, رابط بلاغ, رابط تذكرة, رابط مراسلة, رابط Google Sheet, رابط خارجي, أخرى
+    val notes: String = "",
+    val sortOrder: Int = 0,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "generated_reports")
+data class GeneratedReportEntity(
+    @PrimaryKey val id: String,
+    val caseId: String = "",
+    val caseNumber: String = "",
+    val clientName: String = "",
+    val templateId: String = "",
+    val title: String,
+    val subtitle: String = "",
+    val sectionsJson: String = "[]",
+    val executiveSummary: String = "",
+    val completionNotes: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val format: String = "PDF", // PDF, DOCX, HTML, TXT
+    val filePath: String = "",
+    val isDeleted: Boolean = false,
+    val deletedAt: Long? = null
+)
+
+@Entity(tableName = "report_templates")
+data class ReportTemplateEntity(
+    @PrimaryKey val id: String,
+    val templateName: String,
+    val title: String,
+    val subtitle: String,
+    val organizationName: String = "منظومة جعفر بدران للأدلة الرقمية والاستشارات السيبرانية",
+    val primaryColorHex: String = "#00E5FF",
+    val accentColorHex: String = "#7C4DFF",
+    val introText: String = "",
+    val outroText: String = "",
+    val signatureTitle: String = "المسؤول والخبير الجنائي",
+    val signatureName: String = "جعفر بدران",
+    val footerText: String = "وثيقة عمل رسمية صادرة ومعتمدة - منظومة جعفر بدران للأدلة الرقمية",
+    val visibleSectionsJson: String = "[]",
+    val sectionsOrderJson: String = "[]",
+    val isDefault: Boolean = false
+)
+
 

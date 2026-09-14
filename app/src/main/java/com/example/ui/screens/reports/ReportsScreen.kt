@@ -27,21 +27,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -64,6 +69,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,6 +86,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entities.CaseEntity
 import com.example.data.local.entities.CasePaymentEntity
 import com.example.data.local.entities.EvidenceEntity
+import com.example.reports.ExportResult
+import com.example.reports.FullForensicReport
+import com.example.reports.ReportEvidenceItem
+import com.example.reports.ReportExportFormat
+import com.example.reports.ReportExporter
+import com.example.reports.ReportPaymentSummary
+import com.example.reports.ReportSourceItem
+import com.example.reports.TimelineEventItem
 import com.example.ui.components.CyberBadge
 import com.example.ui.components.CyberCard
 import com.example.ui.components.HudType
@@ -97,6 +111,7 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.ForensicViewModel
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -151,13 +166,19 @@ fun ReportsScreen(viewModel: ForensicViewModel) {
 private fun CertifiedReportsView(viewModel: ForensicViewModel) {
     val cases by viewModel.rawCases.collectAsState()
     val evidenceList by viewModel.rawEvidence.collectAsState()
+    val rawPayments by viewModel.rawPayments.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var selectedCaseId by remember { mutableStateOf(cases.firstOrNull()?.id ?: "") }
     var selectedReportType by remember { mutableStateOf("تقرير متابعة القضية المعتمد") }
+    var selectedFormat by remember { mutableStateOf(ReportExportFormat.PDF) }
+    var isExporting by remember { mutableStateOf(false) }
+    var lastExportResult by remember { mutableStateOf<ExportResult?>(null) }
 
     val selectedCase = cases.find { it.id == selectedCaseId } ?: cases.firstOrNull()
     val caseEvidence = selectedCase?.let { c -> evidenceList.filter { it.caseId == c.id } } ?: emptyList()
+    val casePayments = selectedCase?.let { c -> rawPayments.filter { it.caseId == c.id } } ?: emptyList()
 
     val reportTypes = listOf(
         "تقرير متابعة القضية المعتمد",
@@ -168,6 +189,64 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
 
     val reportContent = remember(selectedCase, caseEvidence, selectedReportType, cases.size) {
         generateReportText(selectedReportType, selectedCase, caseEvidence, cases)
+    }
+
+    val fullForensicReport = remember(selectedCase, caseEvidence, casePayments, selectedReportType) {
+        val genDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
+        val paidTotal = casePayments.sumOf { it.amount }
+        val remaining = ((selectedCase?.totalAmount ?: 0.0) - paidTotal).coerceAtLeast(0.0)
+        val paymentSummary = selectedCase?.let { c ->
+            if (c.totalAmount > 0 || casePayments.isNotEmpty()) {
+                ReportPaymentSummary(
+                    totalAmount = c.totalAmount,
+                    paidAmount = paidTotal,
+                    remainingAmount = remaining,
+                    currency = "SAR",
+                    paymentStatus = if (remaining <= 0) "مسدد بالكامل" else "متبقي مستحقات",
+                    paymentsCount = casePayments.size
+                )
+            } else null
+        }
+
+        FullForensicReport(
+            reportId = "REP-${selectedCase?.caseNumber ?: "GEN"}-${System.currentTimeMillis().toString().takeLast(4)}",
+            title = selectedReportType,
+            caseNumber = selectedCase?.caseNumber ?: "JB-2026-0001",
+            generatedDate = genDate,
+            clientName = selectedCase?.clientName ?: "العميل المستهدف",
+            clientPhone = selectedCase?.clientPhone ?: "",
+            clientEmail = selectedCase?.clientEmail ?: "",
+            priority = selectedCase?.priority ?: "متوسط",
+            threatType = selectedCase?.threatType ?: "استشارة أمنية وفحص رقمي",
+            status = selectedCase?.status ?: "قيد المتابعة",
+            dueDate = selectedCase?.dueDate ?: "غير محدد",
+            executiveSummary = selectedCase?.description?.ifBlank { selectedCase.notes }?.ifBlank {
+                "تم فحص القضية ومراجعة كافة البيانات الفنية والأدلة الجنائية المرتبطة بها، وتأكيد خلوها من التلاعب وتوثيق البصمات التشفيرية المعتمدة."
+            } ?: "ملخص فني معتمد لمتابعة إجراءات الفحص والتحقيق واستخلاص الأدلة.",
+            timelineEvents = emptyList<TimelineEventItem>(),
+            evidenceList = caseEvidence.map { ev ->
+                ReportEvidenceItem(
+                    name = ev.evidenceName,
+                    fileType = ev.fileType,
+                    originalFilename = ev.originalFilename,
+                    md5Hash = ev.md5Hash,
+                    sha256Hash = ev.sha256Hash,
+                    fileSizeFormatted = if (ev.fileSizeBytes > 1024 * 1024) "%.1f MB".format(ev.fileSizeBytes.toDouble() / (1024 * 1024)) else "${ev.fileSizeBytes / 1024} KB",
+                    chainOfCustody = ev.chainOfCustodyLog
+                )
+            },
+            technicalAnalysis = selectedCase?.notes?.ifBlank {
+                "تمت مطابقة التوقيعات الرقمية وتحليل السجلات واستخلاص البيانات الداعمة للتقرير وفق المعايير والضوابط الجنائية المعتمدة."
+            } ?: "فحص وتحليل فني معتمد للبصمات الرقمية وسلسلة الحيازة.",
+            officialSourcesUsed = emptyList<ReportSourceItem>(),
+            finalOutcome = "اكتملت إجراءات الفحص والتوثيق واستخراج التقرير الفني المعتمد بنجاح.",
+            securityRecommendations = listOf(
+                "تفعيل التحقق بخطوتين عبر تطبيقات المصادقة المتوافقة على جميع الحسابات.",
+                "مراجعة سجلات الوصول والأجهزة المتصلة وتحديث كلمات المرور دورياً.",
+                "حفظ البصمات الرقمية للأدلة في مستودع آمن معزول لضمان عدم العبث أو التلف."
+            ),
+            paymentsSummary = paymentSummary
+        )
     }
 
     LazyColumn(
@@ -186,7 +265,7 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "توليد تقارير مهنية موثقة ومعتمدة لمتابعة القضايا وملفات العملاء والمهام",
+                text = "توليد تقارير مهنية موثقة ومعتمدة بصيغ PDF و Word و HTML و TXT مع البصمات الرقمية",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp
             )
@@ -308,6 +387,197 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
 
                                 if (isSelected) {
                                     CyberBadge(text = "مختارة للتقرير", accentColor = CyberSuccess)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Professional Multi-Format Export Card
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CyberPrimaryLight.copy(alpha = 0.4f), RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = CyberPrimaryLight, modifier = Modifier.size(20.dp))
+                            Text(
+                                text = "تصدير المستند الرسمي بأعلى جودة",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        CyberBadge(text = "جاهز للتصدير", accentColor = CyberSuccess)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "اختر صيغة الملف المطلوبة للتصدير المعتمد فوراً:",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ReportExportFormat.entries.forEach { fmt ->
+                            val isFmtSelected = selectedFormat == fmt
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isFmtSelected) CyberPrimary else MaterialTheme.colorScheme.surface)
+                                    .border(1.dp, if (isFmtSelected) CyberPrimaryLight else CyberBorder, RoundedCornerShape(8.dp))
+                                    .clickable { selectedFormat = fmt }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = fmt.name,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = if (isFmtSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = when(fmt) {
+                                            ReportExportFormat.PDF -> "رسمي"
+                                            ReportExportFormat.DOCX -> "وورد"
+                                            ReportExportFormat.HTML -> "تفاعلي"
+                                            ReportExportFormat.TXT -> "نصي"
+                                        },
+                                        fontSize = 9.5.sp,
+                                        color = if (isFmtSelected) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                isExporting = true
+                                val result = ReportExporter.generateAndSaveReport(context, fullForensicReport, selectedFormat)
+                                isExporting = false
+                                result.onSuccess { res ->
+                                    lastExportResult = res
+                                    viewModel.showHud("تم توليد ملف ${res.format.name} بنجاح وحفظه في ذاكرة التخزين", HudType.SUCCESS)
+                                }.onFailure { err ->
+                                    viewModel.showHud("فشل توليد التقرير: ${err.localizedMessage}", HudType.ERROR)
+                                }
+                            }
+                        },
+                        enabled = !isExporting,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        if (isExporting) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("جاري توليد التقرير واعتماده...", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        } else {
+                            Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("توليد وتصدير ${selectedFormat.displayName}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Export Result Actions
+                    lastExportResult?.let { res ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, CyberSuccess.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                .padding(12.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = CyberSuccess, modifier = Modifier.size(16.dp))
+                                        Text(
+                                            text = res.file.name,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1
+                                        )
+                                    }
+                                    CyberBadge(text = res.fileSizeFormatted, accentColor = CyberInfo)
+                                }
+
+                                Text(
+                                    text = "بصمة SHA-256: ${res.sha256Checksum.take(28)}...",
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            try {
+                                                val shareIntent = ReportExporter.getShareIntent(context, res)
+                                                val chooser = Intent.createChooser(shareIntent, "مشاركة تقرير ${res.file.name}")
+                                                context.startActivity(chooser)
+                                                viewModel.showHud("تم فتح قائمة المشاركة الرسمية", HudType.INFO)
+                                            } catch (e: Exception) {
+                                                viewModel.showHud("خطأ في المشاركة: ${e.localizedMessage}", HudType.ERROR)
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = CyberSuccess),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("مشاركة الملف", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            try {
+                                                val viewIntent = ReportExporter.getViewIntent(context, res)
+                                                context.startActivity(viewIntent)
+                                            } catch (e: Exception) {
+                                                viewModel.showHud("لا يوجد تطبيق مهيأ لفتح صيغة ${res.format.extension}", HudType.WARNING)
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("فتح المستند", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }

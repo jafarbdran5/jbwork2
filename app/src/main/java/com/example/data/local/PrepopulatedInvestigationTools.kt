@@ -3,7 +3,7 @@ package com.example.data.local
 import com.example.data.local.entities.InvestigationToolEntity
 
 object PrepopulatedInvestigationTools {
-    val OFFICIAL_TOOLS = listOf(
+    private val BASE_TOOLS = listOf(
         // ==========================================
         // 1. REVERSE IMAGE SEARCH & IMAGE FORENSICS
         // ==========================================
@@ -789,4 +789,15 @@ object PrepopulatedInvestigationTools {
             isFavorite = true
         )
     )
+
+    val OFFICIAL_TOOLS: List<InvestigationToolEntity> by lazy {
+        BASE_TOOLS +
+            PrepopulatedInvestigationToolsExpanded1.ADDITIONAL_TOOLS_PART1 +
+            PrepopulatedInvestigationToolsExpanded2.ADDITIONAL_TOOLS_PART2 +
+            PrepopulatedInvestigationToolsExpanded3.ADDITIONAL_TOOLS_PART3 +
+            PrepopulatedInvestigationToolsExpanded4.ADDITIONAL_TOOLS_PART4 +
+            PrepopulatedInvestigationToolsExpanded5.ADDITIONAL_TOOLS_PART5 +
+            PrepopulatedInvestigationToolsExpanded6.ADDITIONAL_TOOLS_PART6 +
+            PrepopulatedInvestigationToolsExpanded7.ADDITIONAL_TOOLS_PART7
+    }
 }

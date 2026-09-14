@@ -3,7 +3,7 @@ package com.example.data.local
 import com.example.data.local.entities.SupportFormEntity
 
 object PrepopulatedSupportForms {
-    val OFFICIAL_FORMS = listOf(
+    private val BASE_FORMS = listOf(
         // ==========================================
         // META / INSTAGRAM
         // ==========================================
@@ -959,4 +959,12 @@ object PrepopulatedSupportForms {
             tags = "steam, valve, stolen account, gaming fraud, cd key recovery"
         )
     )
+
+    val OFFICIAL_FORMS: List<SupportFormEntity> by lazy {
+        BASE_FORMS +
+            PrepopulatedSupportFormsExpanded.ADDITIONAL_FORMS +
+            PrepopulatedSupportFormsExpanded2.ADDITIONAL_FORMS_PART2 +
+            PrepopulatedSupportFormsExpanded3.ADDITIONAL_FORMS_PART3 +
+            PrepopulatedSupportFormsExpanded4.ADDITIONAL_FORMS_PART4
+    }
 }

@@ -34,6 +34,9 @@ import com.example.data.local.dao.AdminAuditLogDao
 import com.example.data.local.dao.OfficialSourceDao
 import com.example.data.local.dao.ProfitShareRuleDao
 import com.example.data.local.dao.FinancialRevenueDao
+import com.example.data.local.dao.CaseCustomLinkDao
+import com.example.data.local.dao.GeneratedReportDao
+import com.example.data.local.dao.ReportTemplateDao
 import com.example.data.local.entities.AdminAuditLogEntity
 import com.example.data.local.entities.OfficialSourceEntity
 import com.example.data.local.entities.ProfitShareRuleEntity
@@ -62,6 +65,9 @@ import com.example.data.local.entities.SystemExpenseEntity
 import com.example.data.local.entities.TaskEntity
 import com.example.data.local.entities.VideoIdeaEntity
 import com.example.data.local.entities.VideoScriptEntity
+import com.example.data.local.entities.CaseCustomLinkEntity
+import com.example.data.local.entities.GeneratedReportEntity
+import com.example.data.local.entities.ReportTemplateEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,9 +101,12 @@ import kotlinx.coroutines.launch
         AdminAuditLogEntity::class,
         OfficialSourceEntity::class,
         ProfitShareRuleEntity::class,
-        FinancialRevenueEntity::class
+        FinancialRevenueEntity::class,
+        CaseCustomLinkEntity::class,
+        GeneratedReportEntity::class,
+        ReportTemplateEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -130,6 +139,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun officialSourceDao(): OfficialSourceDao
     abstract fun profitShareRuleDao(): ProfitShareRuleDao
     abstract fun financialRevenueDao(): FinancialRevenueDao
+    abstract fun caseCustomLinkDao(): CaseCustomLinkDao
+    abstract fun generatedReportDao(): GeneratedReportDao
+    abstract fun reportTemplateDao(): ReportTemplateDao
 
     companion object {
         @Volatile
@@ -229,6 +241,78 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE `app_section_configs` ADD COLUMN `showInBottomNav` INTEGER NOT NULL DEFAULT 0")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE `app_section_configs` ADD COLUMN `bottomNavOrder` INTEGER NOT NULL DEFAULT 0")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE `app_section_configs` ADD COLUMN `isDefaultStartScreen` INTEGER NOT NULL DEFAULT 0")
+                } catch (_: Exception) {}
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `case_custom_links` (
+                        `id` TEXT NOT NULL,
+                        `caseId` TEXT NOT NULL,
+                        `caseNumber` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `url` TEXT NOT NULL,
+                        `linkType` TEXT NOT NULL DEFAULT 'رابط خارجي',
+                        `notes` TEXT NOT NULL DEFAULT '',
+                        `sortOrder` INTEGER NOT NULL DEFAULT 0,
+                        `createdAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `generated_reports` (
+                        `id` TEXT NOT NULL,
+                        `caseId` TEXT NOT NULL DEFAULT '',
+                        `caseNumber` TEXT NOT NULL DEFAULT '',
+                        `clientName` TEXT NOT NULL DEFAULT '',
+                        `templateId` TEXT NOT NULL DEFAULT '',
+                        `title` TEXT NOT NULL,
+                        `subtitle` TEXT NOT NULL DEFAULT '',
+                        `sectionsJson` TEXT NOT NULL DEFAULT '[]',
+                        `executiveSummary` TEXT NOT NULL DEFAULT '',
+                        `completionNotes` TEXT NOT NULL DEFAULT '',
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `format` TEXT NOT NULL DEFAULT 'PDF',
+                        `filePath` TEXT NOT NULL DEFAULT '',
+                        `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                        `deletedAt` INTEGER,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `report_templates` (
+                        `id` TEXT NOT NULL,
+                        `templateName` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `subtitle` TEXT NOT NULL,
+                        `organizationName` TEXT NOT NULL DEFAULT 'منظومة جعفر بدران للأدلة الرقمية والاستشارات السيبرانية',
+                        `primaryColorHex` TEXT NOT NULL DEFAULT '#00E5FF',
+                        `accentColorHex` TEXT NOT NULL DEFAULT '#7C4DFF',
+                        `introText` TEXT NOT NULL DEFAULT '',
+                        `outroText` TEXT NOT NULL DEFAULT '',
+                        `signatureTitle` TEXT NOT NULL DEFAULT 'المسؤول والخبير الجنائي',
+                        `signatureName` TEXT NOT NULL DEFAULT 'جعفر بدران',
+                        `footerText` TEXT NOT NULL DEFAULT 'وثيقة عمل رسمية صادرة ومعتمدة - منظومة جعفر بدران للأدلة الرقمية',
+                        `visibleSectionsJson` TEXT NOT NULL DEFAULT '[]',
+                        `sectionsOrderJson` TEXT NOT NULL DEFAULT '[]',
+                        `isDefault` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -236,7 +320,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "jaffar_forensics.db"
                 )
-                .addMigrations(MIGRATION_4_5, MIGRATION_6_7, MIGRATION_8_9)
+                .addMigrations(MIGRATION_4_5, MIGRATION_6_7, MIGRATION_8_9, MIGRATION_9_10)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
@@ -482,12 +566,12 @@ abstract class AppDatabase : RoomDatabase() {
             )
 
             // Seed Direct Support Forms
-            if (db.supportFormDao().getCount() == 0) {
+            if (db.supportFormDao().getCount() < PrepopulatedSupportForms.OFFICIAL_FORMS.size) {
                 db.supportFormDao().insertAll(PrepopulatedSupportForms.OFFICIAL_FORMS)
             }
 
             // Seed Digital Investigation Tools
-            if (db.investigationToolDao().getCount() == 0) {
+            if (db.investigationToolDao().getCount() < PrepopulatedInvestigationTools.OFFICIAL_TOOLS.size) {
                 db.investigationToolDao().insertAll(PrepopulatedInvestigationTools.OFFICIAL_TOOLS)
             }
 
@@ -607,14 +691,14 @@ abstract class AppDatabase : RoomDatabase() {
             // Seed App Sections if empty
             if (db.appSectionConfigDao().getCount() == 0) {
                 val defaultSections = listOf(
-                    AppSectionConfigEntity("DASHBOARD", "الرئيسية", "لوحة المعلومات والملخص السريع", "Home", 0, isVisible = true, isCustom = false, category = "الرئيسية"),
-                    AppSectionConfigEntity("CASES", "القضايا", "إدارة وتتبع القضايا الجنائية والسيبرانية", "Folder", 1, isVisible = true, isCustom = false, category = "العمليات"),
+                    AppSectionConfigEntity("DASHBOARD", "الرئيسية", "لوحة المعلومات والملخص السريع", "Home", 0, isVisible = true, isCustom = false, category = "الرئيسية", showInBottomNav = true, bottomNavOrder = 0, isDefaultStartScreen = true),
+                    AppSectionConfigEntity("CASES", "القضايا", "إدارة وتتبع القضايا الجنائية والسيبرانية", "Folder", 1, isVisible = true, isCustom = false, category = "العمليات", showInBottomNav = true, bottomNavOrder = 1),
                     AppSectionConfigEntity("EXTERNAL_REQUESTS", "الطلبات الخارجية", "استقبال وإدارة الطلبات الواردة وجداول العمل", "CloudDownload", 2, isVisible = true, isCustom = false, category = "العمليات"),
-                    AppSectionConfigEntity("EVIDENCE", "المرفقات والملفات", "توثيق الأدلة والبصمات الرقمية وتتبع الحيازة", "AttachFile", 3, isVisible = true, isCustom = false, category = "الأدلة والتحقيق"),
-                    AppSectionConfigEntity("TASKS", "المهام والتقويم", "توزيع ومتابعة المهام ومواعيد المتابعة", "Assignment", 4, isVisible = true, isCustom = false, category = "العمليات"),
+                    AppSectionConfigEntity("EVIDENCE", "المرفقات والملفات", "توثيق الأدلة والبصمات الرقمية وتتبع الحيازة", "AttachFile", 3, isVisible = true, isCustom = false, category = "الأدلة والتحقيق", showInBottomNav = true, bottomNavOrder = 2),
+                    AppSectionConfigEntity("TASKS", "المهام والتقويم", "توزيع ومتابعة المهام ومواعيد المتابعة", "Assignment", 4, isVisible = true, isCustom = false, category = "العمليات", showInBottomNav = true, bottomNavOrder = 3),
                     AppSectionConfigEntity("SUPPORT_FORMS", "نماذج الدعم المباشرة", "بوابات الدعم الفني الرسمية ومنصات التواصل", "ContactSupport", 5, isVisible = true, isCustom = false, category = "المصادر والأدوات"),
                     AppSectionConfigEntity("INVESTIGATION_HUB", "أدوات ومصادر العمل", "أدوات التحقق والتقصي وOSINT وتحليل الشبكات", "TravelExplore", 6, isVisible = true, isCustom = false, category = "المصادر والأدوات"),
-                    AppSectionConfigEntity("STUDIO", "استوديو المحتوى", "إدارة أفكار وسكربتات ومسودات التوعية الأمنية", "AutoAwesome", 7, isVisible = true, isCustom = false, category = "الإعلام والتوعية"),
+                    AppSectionConfigEntity("STUDIO", "استوديو المحتوى", "إدارة أفكار وسكربتات ومسودات التوعية الأمنية", "AutoAwesome", 7, isVisible = true, isCustom = false, category = "الإعلام والتوعية", showInBottomNav = true, bottomNavOrder = 4),
                     AppSectionConfigEntity("CLIENTS", "العملاء", "سجل العملاء وإدارة العلاقات ومستوى الخطورة", "People", 8, isVisible = true, isCustom = false, category = "العمليات"),
                     AppSectionConfigEntity("KNOWLEDGE", "الموسوعة المعرفية", "الأدلة الإجرائية والأنظمة والسياسات الرسمية", "MenuBook", 9, isVisible = true, isCustom = false, category = "المعرفة"),
                     AppSectionConfigEntity("REPORTS", "تقارير العمل والمتابعة", "لوحة الأرباح والتحصيلات وإصدار تقارير العمل", "Assessment", 10, isVisible = true, isCustom = false, category = "المالية والتقارير"),
@@ -624,6 +708,20 @@ abstract class AppDatabase : RoomDatabase() {
                     AppSectionConfigEntity("SECURITY", "سجل الأمان والتدقيق", "مراقبة العمليات والتحقق البيومتري والتأمين", "Security", 14, isVisible = true, isCustom = false, category = "النظام")
                 )
                 db.appSectionConfigDao().insertAll(defaultSections)
+            } else {
+                // Ensure default bottom nav items are activated if not already configured
+                val defaultBottomIds = listOf("DASHBOARD", "CASES", "EVIDENCE", "TASKS", "STUDIO")
+                defaultBottomIds.forEachIndexed { index, secId ->
+                    val sec = db.appSectionConfigDao().getSectionById(secId)
+                    if (sec != null && !sec.showInBottomNav) {
+                        db.appSectionConfigDao().updateBottomNavConfig(secId, true, index)
+                    }
+                }
+            }
+
+            // Seed Report Templates if empty
+            if (db.reportTemplateDao().getCount() == 0) {
+                db.reportTemplateDao().insertAll(PrepopulatedReportTemplates.DEFAULT_TEMPLATES)
             }
 
             // Seed System Categories

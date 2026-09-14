@@ -388,4 +388,79 @@ interface VideoScriptDao {
     suspend fun permanentDelete(id: String)
 }
 
+@Dao
+interface CaseCustomLinkDao {
+    @Query("SELECT * FROM case_custom_links WHERE caseId = :caseId ORDER BY sortOrder ASC, createdAt DESC")
+    fun getLinksForCase(caseId: String): Flow<List<com.example.data.local.entities.CaseCustomLinkEntity>>
+
+    @Query("SELECT * FROM case_custom_links WHERE id = :id")
+    suspend fun getLinkById(id: String): com.example.data.local.entities.CaseCustomLinkEntity?
+
+    @Query("SELECT COUNT(*) FROM case_custom_links WHERE caseId = :caseId")
+    suspend fun getCountForCase(caseId: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(link: com.example.data.local.entities.CaseCustomLinkEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(links: List<com.example.data.local.entities.CaseCustomLinkEntity>)
+
+    @Query("DELETE FROM case_custom_links WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM case_custom_links WHERE caseId = :caseId")
+    suspend fun deleteByCaseId(caseId: String)
+}
+
+@Dao
+interface GeneratedReportDao {
+    @Query("SELECT * FROM generated_reports WHERE isDeleted = 0 ORDER BY updatedAt DESC")
+    fun getAllActiveReports(): Flow<List<com.example.data.local.entities.GeneratedReportEntity>>
+
+    @Query("SELECT * FROM generated_reports WHERE caseId = :caseId AND isDeleted = 0 ORDER BY updatedAt DESC")
+    fun getReportsForCase(caseId: String): Flow<List<com.example.data.local.entities.GeneratedReportEntity>>
+
+    @Query("SELECT * FROM generated_reports WHERE isDeleted = 1 ORDER BY deletedAt DESC")
+    fun getDeletedReports(): Flow<List<com.example.data.local.entities.GeneratedReportEntity>>
+
+    @Query("SELECT * FROM generated_reports WHERE id = :id")
+    suspend fun getReportById(id: String): com.example.data.local.entities.GeneratedReportEntity?
+
+    @Query("SELECT COUNT(*) FROM generated_reports WHERE isDeleted = 0")
+    suspend fun getCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(report: com.example.data.local.entities.GeneratedReportEntity)
+
+    @Query("UPDATE generated_reports SET isDeleted = 1, deletedAt = :deletedAt WHERE id = :id")
+    suspend fun softDelete(id: String, deletedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE generated_reports SET isDeleted = 0, deletedAt = NULL WHERE id = :id")
+    suspend fun restoreReport(id: String)
+
+    @Query("DELETE FROM generated_reports WHERE id = :id")
+    suspend fun permanentDelete(id: String)
+}
+
+@Dao
+interface ReportTemplateDao {
+    @Query("SELECT * FROM report_templates ORDER BY isDefault DESC, templateName ASC")
+    fun getAllTemplates(): Flow<List<com.example.data.local.entities.ReportTemplateEntity>>
+
+    @Query("SELECT * FROM report_templates WHERE id = :id")
+    suspend fun getTemplateById(id: String): com.example.data.local.entities.ReportTemplateEntity?
+
+    @Query("SELECT COUNT(*) FROM report_templates")
+    suspend fun getCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(template: com.example.data.local.entities.ReportTemplateEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(templates: List<com.example.data.local.entities.ReportTemplateEntity>)
+
+    @Query("DELETE FROM report_templates WHERE id = :id AND isDefault = 0")
+    suspend fun deleteTemplate(id: String)
+}
+
 

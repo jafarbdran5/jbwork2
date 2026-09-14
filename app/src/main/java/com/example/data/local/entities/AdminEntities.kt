@@ -12,7 +12,10 @@ data class AppSectionConfigEntity(
     val sortOrder: Int,
     val isVisible: Boolean = true,
     val isCustom: Boolean = false,
-    val category: String = "MAIN"
+    val category: String = "MAIN",
+    val showInBottomNav: Boolean = false,
+    val bottomNavOrder: Int = 0,
+    val isDefaultStartScreen: Boolean = false
 )
 
 @Entity(tableName = "custom_field_definitions")

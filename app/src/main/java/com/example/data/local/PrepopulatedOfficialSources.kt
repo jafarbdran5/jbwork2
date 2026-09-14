@@ -44,7 +44,7 @@ object PrepopulatedOfficialSources {
         SEC_REGIONAL_LOCAL
     )
 
-    val SOURCES: List<OfficialSourceEntity> = listOf(
+    private val BASE_SOURCES: List<OfficialSourceEntity> = listOf(
         // =========================================================================
         // 1. بوابات إنفاذ القانون (Law Enforcement Portals)
         // =========================================================================
@@ -1375,6 +1375,16 @@ object PrepopulatedOfficialSources {
             sortOrder = 3
         )
     )
+
+    val SOURCES: List<OfficialSourceEntity> by lazy {
+        BASE_SOURCES +
+            PrepopulatedOfficialSourcesExpanded1.ADDITIONAL_SOURCES_PART1 +
+            PrepopulatedOfficialSourcesExpanded2.ADDITIONAL_SOURCES_PART2 +
+            PrepopulatedOfficialSourcesExpanded3.ADDITIONAL_SOURCES_PART3 +
+            PrepopulatedOfficialSourcesExpanded4.ADDITIONAL_SOURCES_PART4 +
+            PrepopulatedOfficialSourcesExpanded5.ADDITIONAL_SOURCES_PART5 +
+            PrepopulatedOfficialSourcesExpanded6.ADDITIONAL_SOURCES_PART6
+    }
 
     val DEFAULT_PROFIT_RULES = listOf(
         ProfitShareRuleEntity(
