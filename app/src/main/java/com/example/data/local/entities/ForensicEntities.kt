@@ -32,7 +32,11 @@ data class CaseEntity(
     val paidAmount: Double = 0.0, // إجمالي المبالغ المدفوعة
     val remainingAmount: Double = 0.0, // المبلغ المتبقي
     val currency: String = "SAR", // العملة
-    val paymentStatus: String = "غير مدفوع" // غير مدفوع, مدفوع جزئيًا, مدفوع بالكامل, معفى, مؤجل
+    val paymentStatus: String = "غير مدفوع", // غير مدفوع, مدفوع جزئيًا, مدفوع بالكامل, معفى, مؤجل
+    // Official & External Identifiers
+    val externalPlatformCaseId: String = "", // رقم أو معرف البلاغ بالمنصة الخارجية (Meta, Google, X, إلخ)
+    val supportTicketId: String = "", // رقم تذكرة الدعم الفني
+    val targetIdentifier: String = "" // معرف الحساب أو الرابط المستهدف
 )
 
 @Entity(tableName = "clients")
@@ -56,7 +60,7 @@ data class EvidenceEntity(
     val caseId: String,
     val caseNumber: String,
     val evidenceName: String,
-    val fileType: String, // Screenshot, Audio, Video, Network Dump, Chat Export, Forensic Image
+    val fileType: String, // Screenshot, Audio, Video, Network Dump, Chat Export, Forensic Image, Document, Archive
     val originalFilename: String,
     val md5Hash: String,
     val sha256Hash: String,
@@ -69,7 +73,12 @@ data class EvidenceEntity(
     val createdDate: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
-    val syncStatus: String = "SYNCED"
+    val syncStatus: String = "SYNCED",
+    // Offline Storage & File System
+    val localFilePath: String = "", // مسار الحفظ المحلي في ذاكرة التطبيق
+    val fileSizeBytes: Long = 0L, // حجم الملف بالبايت
+    val fileSizeFormatted: String = "0 KB", // حجم الملف منسق
+    val mimeType: String = "" // نوع MIME للملف
 )
 
 @Entity(tableName = "content_studio")

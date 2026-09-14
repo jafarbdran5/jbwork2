@@ -78,6 +78,9 @@ interface EvidenceDao {
     @Query("SELECT * FROM evidence WHERE caseId = :caseId AND isDeleted = 0 ORDER BY createdDate DESC")
     fun getEvidenceForCase(caseId: String): Flow<List<EvidenceEntity>>
 
+    @Query("SELECT * FROM evidence WHERE caseId = :caseId AND isDeleted = 1 ORDER BY deletedAt DESC")
+    fun getDeletedEvidenceForCase(caseId: String): Flow<List<EvidenceEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(evidence: EvidenceEntity)
 

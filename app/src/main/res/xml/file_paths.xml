@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path name="case_files" path="cases/" />
+    <files-path name="all_files" path="." />
+</paths>

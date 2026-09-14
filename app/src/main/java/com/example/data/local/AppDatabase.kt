@@ -26,6 +26,19 @@ import com.example.data.local.dao.SyncOperationDao
 import com.example.data.local.dao.TaskDao
 import com.example.data.local.dao.VideoIdeaDao
 import com.example.data.local.dao.VideoScriptDao
+import com.example.data.local.dao.AppSectionConfigDao
+import com.example.data.local.dao.CustomFieldDefinitionDao
+import com.example.data.local.dao.SystemExpenseDao
+import com.example.data.local.dao.SystemCategoryDao
+import com.example.data.local.dao.AdminAuditLogDao
+import com.example.data.local.dao.OfficialSourceDao
+import com.example.data.local.dao.ProfitShareRuleDao
+import com.example.data.local.dao.FinancialRevenueDao
+import com.example.data.local.entities.AdminAuditLogEntity
+import com.example.data.local.entities.OfficialSourceEntity
+import com.example.data.local.entities.ProfitShareRuleEntity
+import com.example.data.local.entities.FinancialRevenueEntity
+import com.example.data.local.entities.AppSectionConfigEntity
 import com.example.data.local.entities.AppSettingsEntity
 import com.example.data.local.entities.AuditLogEntity
 import com.example.data.local.entities.CaseAuditLogEntity
@@ -35,6 +48,7 @@ import com.example.data.local.entities.CaseLinkedItemEntity
 import com.example.data.local.entities.CasePaymentEntity
 import com.example.data.local.entities.ClientEntity
 import com.example.data.local.entities.ContentEntity
+import com.example.data.local.entities.CustomFieldDefinitionEntity
 import com.example.data.local.entities.EvidenceEntity
 import com.example.data.local.entities.ExternalRequestEntity
 import com.example.data.local.entities.ExternalRequestSourceEntity
@@ -43,6 +57,8 @@ import com.example.data.local.entities.InvestigationToolEntity
 import com.example.data.local.entities.KnowledgeEntity
 import com.example.data.local.entities.SupportFormEntity
 import com.example.data.local.entities.SyncOperationEntity
+import com.example.data.local.entities.SystemCategoryEntity
+import com.example.data.local.entities.SystemExpenseEntity
 import com.example.data.local.entities.TaskEntity
 import com.example.data.local.entities.VideoIdeaEntity
 import com.example.data.local.entities.VideoScriptEntity
@@ -71,9 +87,17 @@ import kotlinx.coroutines.launch
         CaseFinancialLogEntity::class,
         CaseAuditLogEntity::class,
         VideoIdeaEntity::class,
-        VideoScriptEntity::class
+        VideoScriptEntity::class,
+        AppSectionConfigEntity::class,
+        CustomFieldDefinitionEntity::class,
+        SystemExpenseEntity::class,
+        SystemCategoryEntity::class,
+        AdminAuditLogEntity::class,
+        OfficialSourceEntity::class,
+        ProfitShareRuleEntity::class,
+        FinancialRevenueEntity::class
     ],
-    version = 6,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -98,6 +122,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun caseAuditLogDao(): CaseAuditLogDao
     abstract fun videoIdeaDao(): VideoIdeaDao
     abstract fun videoScriptDao(): VideoScriptDao
+    abstract fun appSectionConfigDao(): AppSectionConfigDao
+    abstract fun customFieldDefinitionDao(): CustomFieldDefinitionDao
+    abstract fun systemExpenseDao(): SystemExpenseDao
+    abstract fun systemCategoryDao(): SystemCategoryDao
+    abstract fun adminAuditLogDao(): AdminAuditLogDao
+    abstract fun officialSourceDao(): OfficialSourceDao
+    abstract fun profitShareRuleDao(): ProfitShareRuleDao
+    abstract fun financialRevenueDao(): FinancialRevenueDao
 
     companion object {
         @Volatile
@@ -114,6 +146,89 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `app_section_configs` (
+                        `id` TEXT NOT NULL,
+                        `displayName` TEXT NOT NULL,
+                        `description` TEXT NOT NULL,
+                        `iconName` TEXT NOT NULL,
+                        `sortOrder` INTEGER NOT NULL,
+                        `isVisible` INTEGER NOT NULL DEFAULT 1,
+                        `isCustom` INTEGER NOT NULL DEFAULT 0,
+                        `category` TEXT NOT NULL DEFAULT 'MAIN',
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `custom_field_definitions` (
+                        `id` TEXT NOT NULL,
+                        `targetEntity` TEXT NOT NULL,
+                        `fieldName` TEXT NOT NULL,
+                        `fieldType` TEXT NOT NULL,
+                        `optionsJson` TEXT NOT NULL DEFAULT '[]',
+                        `isRequired` INTEGER NOT NULL DEFAULT 0,
+                        `showInList` INTEGER NOT NULL DEFAULT 0,
+                        `showInDetails` INTEGER NOT NULL DEFAULT 1,
+                        `sortOrder` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `system_expenses` (
+                        `id` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `date` TEXT NOT NULL,
+                        `notes` TEXT NOT NULL DEFAULT '',
+                        `relatedCaseId` TEXT DEFAULT NULL,
+                        `createdDate` INTEGER NOT NULL,
+                        `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                        `syncStatus` TEXT NOT NULL DEFAULT 'SYNCED',
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `system_categories` (
+                        `id` TEXT NOT NULL,
+                        `scope` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `color` TEXT NOT NULL DEFAULT '',
+                        `sortOrder` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `admin_audit_logs` (
+                        `id` TEXT NOT NULL,
+                        `adminName` TEXT NOT NULL,
+                        `action` TEXT NOT NULL,
+                        `target` TEXT NOT NULL,
+                        `oldValue` TEXT NOT NULL,
+                        `newValue` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `dateFormatted` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `cases` ADD COLUMN `externalPlatformCaseId` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `cases` ADD COLUMN `supportTicketId` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `cases` ADD COLUMN `targetIdentifier` TEXT NOT NULL DEFAULT ''")
+
+                db.execSQL("ALTER TABLE `evidence` ADD COLUMN `localFilePath` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `evidence` ADD COLUMN `fileSizeBytes` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `evidence` ADD COLUMN `fileSizeFormatted` TEXT NOT NULL DEFAULT '0 KB'")
+                db.execSQL("ALTER TABLE `evidence` ADD COLUMN `mimeType` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -121,7 +236,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "jaffar_forensics.db"
                 )
-                .addMigrations(MIGRATION_4_5)
+                .addMigrations(MIGRATION_4_5, MIGRATION_6_7, MIGRATION_8_9)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
@@ -487,6 +602,62 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 )
                 db.externalRequestDao().insertAll(defaultRequests)
+            }
+
+            // Seed App Sections if empty
+            if (db.appSectionConfigDao().getCount() == 0) {
+                val defaultSections = listOf(
+                    AppSectionConfigEntity("DASHBOARD", "الرئيسية", "لوحة المعلومات والملخص السريع", "Home", 0, isVisible = true, isCustom = false, category = "الرئيسية"),
+                    AppSectionConfigEntity("CASES", "القضايا", "إدارة وتتبع القضايا الجنائية والسيبرانية", "Folder", 1, isVisible = true, isCustom = false, category = "العمليات"),
+                    AppSectionConfigEntity("EXTERNAL_REQUESTS", "الطلبات الخارجية", "استقبال وإدارة الطلبات الواردة وجداول العمل", "CloudDownload", 2, isVisible = true, isCustom = false, category = "العمليات"),
+                    AppSectionConfigEntity("EVIDENCE", "المرفقات والملفات", "توثيق الأدلة والبصمات الرقمية وتتبع الحيازة", "AttachFile", 3, isVisible = true, isCustom = false, category = "الأدلة والتحقيق"),
+                    AppSectionConfigEntity("TASKS", "المهام والتقويم", "توزيع ومتابعة المهام ومواعيد المتابعة", "Assignment", 4, isVisible = true, isCustom = false, category = "العمليات"),
+                    AppSectionConfigEntity("SUPPORT_FORMS", "نماذج الدعم المباشرة", "بوابات الدعم الفني الرسمية ومنصات التواصل", "ContactSupport", 5, isVisible = true, isCustom = false, category = "المصادر والأدوات"),
+                    AppSectionConfigEntity("INVESTIGATION_HUB", "أدوات ومصادر العمل", "أدوات التحقق والتقصي وOSINT وتحليل الشبكات", "TravelExplore", 6, isVisible = true, isCustom = false, category = "المصادر والأدوات"),
+                    AppSectionConfigEntity("STUDIO", "استوديو المحتوى", "إدارة أفكار وسكربتات ومسودات التوعية الأمنية", "AutoAwesome", 7, isVisible = true, isCustom = false, category = "الإعلام والتوعية"),
+                    AppSectionConfigEntity("CLIENTS", "العملاء", "سجل العملاء وإدارة العلاقات ومستوى الخطورة", "People", 8, isVisible = true, isCustom = false, category = "العمليات"),
+                    AppSectionConfigEntity("KNOWLEDGE", "الموسوعة المعرفية", "الأدلة الإجرائية والأنظمة والسياسات الرسمية", "MenuBook", 9, isVisible = true, isCustom = false, category = "المعرفة"),
+                    AppSectionConfigEntity("REPORTS", "تقارير العمل والمتابعة", "لوحة الأرباح والتحصيلات وإصدار تقارير العمل", "Assessment", 10, isVisible = true, isCustom = false, category = "المالية والتقارير"),
+                    AppSectionConfigEntity("SEARCH", "البحث الشامل", "محرك بحث عميق عبر جميع أقسام المنظومة", "Search", 11, isVisible = true, isCustom = false, category = "أدوات عامة"),
+                    AppSectionConfigEntity("TRASH", "سلة المحذوفات", "استعادة أو التطهير النهائي للعناصر المحذوفة", "Delete", 12, isVisible = true, isCustom = false, category = "الصيانة"),
+                    AppSectionConfigEntity("SETTINGS", "الإعدادات والمزامنة", "التحكم بالنظام وإدارة المنظومة والربط السحابي", "Settings", 13, isVisible = true, isCustom = false, category = "النظام"),
+                    AppSectionConfigEntity("SECURITY", "سجل الأمان والتدقيق", "مراقبة العمليات والتحقق البيومتري والتأمين", "Security", 14, isVisible = true, isCustom = false, category = "النظام")
+                )
+                db.appSectionConfigDao().insertAll(defaultSections)
+            }
+
+            // Seed System Categories
+            val defaultCategories = listOf(
+                SystemCategoryEntity("cat_case_01", "CASES", "ابتزاز رقمي", "#E53935", 0),
+                SystemCategoryEntity("cat_case_02", "CASES", "احتيال مالي", "#FB8C00", 1),
+                SystemCategoryEntity("cat_case_03", "CASES", "انتحال شخصية", "#8E24AA", 2),
+                SystemCategoryEntity("cat_case_04", "CASES", "اختراق وتجسس", "#D81B60", 3),
+                SystemCategoryEntity("cat_case_05", "CASES", "فحص جنائي", "#1E88E5", 4),
+                SystemCategoryEntity("cat_tool_01", "TOOLS", "استخبارات المصادر المفتوحة (OSINT)", "#00ACC1", 0),
+                SystemCategoryEntity("cat_tool_02", "TOOLS", "فحص الروابط والملفات المشبوهة", "#43A047", 1),
+                SystemCategoryEntity("cat_tool_03", "TOOLS", "التحقق من الهوية والصور", "#3949AB", 2),
+                SystemCategoryEntity("cat_tool_04", "TOOLS", "تحليل التشفير والبصمات", "#5E35B1", 3),
+                SystemCategoryEntity("cat_form_01", "FORMS", "بوابات الإنفاذ والجرائم الإلكترونية", "#D32F2F", 0),
+                SystemCategoryEntity("cat_form_02", "FORMS", "منصات التواصل الاجتماعي الرسمية", "#1976D2", 1),
+                SystemCategoryEntity("cat_form_03", "FORMS", "مزودو خدمات الاستضافة والبريد", "#388E3C", 2),
+                SystemCategoryEntity("cat_exp_01", "EXPENSES", "أدوات وبرامج تقنية", "#0288D1", 0),
+                SystemCategoryEntity("cat_exp_02", "EXPENSES", "سيرفرات واستضافة وسحابة", "#7B1FA2", 1),
+                SystemCategoryEntity("cat_exp_03", "EXPENSES", "مصاريف إدارية ومكتبية", "#689F38", 2),
+                SystemCategoryEntity("cat_exp_04", "EXPENSES", "استشارات وفريق عمل", "#F57C00", 3)
+            )
+            db.systemCategoryDao().insertAll(defaultCategories)
+
+            // Seed Comprehensive Official Sources & Portals (Ensures all official platforms are present)
+            db.officialSourceDao().insertAll(PrepopulatedOfficialSources.SOURCES)
+
+            // Seed Profit Share Rules
+            if (db.profitShareRuleDao().getCount() == 0) {
+                db.profitShareRuleDao().insertAll(PrepopulatedOfficialSources.DEFAULT_PROFIT_RULES)
+            }
+
+            // Seed Financial Revenues
+            if (db.financialRevenueDao().getCount() == 0) {
+                db.financialRevenueDao().insertAll(PrepopulatedOfficialSources.SAMPLE_FINANCIAL_REVENUES)
             }
         } catch (e: Exception) {
             android.util.Log.e("AppDatabase", "Error during seedInitialData", e)

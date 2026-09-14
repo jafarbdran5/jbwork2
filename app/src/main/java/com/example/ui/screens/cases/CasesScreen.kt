@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,10 +39,16 @@ import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -56,6 +63,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -98,9 +107,42 @@ import com.example.ui.viewmodel.ForensicViewModel
 import java.util.UUID
 
 val CASE_STATUSES = listOf("الكل", "جديدة", "قيد المراجعة", "قيد المعالجة", "بانتظار المعلومات", "قيد المتابعة", "مكتملة", "مغلقة", "مؤرشفة")
-val THREAT_TYPES = listOf("طلب خدمة", "استشارة فنية", "متابعة ملف", "دعم تقني", "توثيق بيانات", "مراجعة حسابات", "تنظيم ملفات", "أخرى")
+val THREAT_TYPES = listOf(
+    "طلب خدمة واستعادة وصول",
+    "استشارة جنائية رقمية",
+    "توثيق أدلة وبصمة رقمية",
+    "مخاطبة منصة / جهة إنفاذ القانون",
+    "بلاغ انتهاك وابتزاز إلكتروني",
+    "مكافحة احتيال وانتحال شخصية",
+    "فحص وتحليل برمجيات خبيثة",
+    "تتبع عناوين IP ونطاقات DNS",
+    "استرداد وتأمين حسابات منصات",
+    "دعم تقني وتأميني فوري",
+    "مراجعة تقارير وتدقيق أمني",
+    "أخرى"
+)
 val PRIORITIES = listOf("حرجة", "عالية", "متوسطة", "منخفضة")
-val CASE_SOURCES = listOf("واتساب", "اتصال هاتفي", "منصة إكس (Twitter)", "موقع شخصي", "توصية عميل", "أخرى")
+val CASE_SOURCES = listOf(
+    "واتساب (WhatsApp)",
+    "اتصال هاتفي مباشر",
+    "بوابة ميتا الرسمية (Meta LEA / Support)",
+    "بوابة جوجل (Google / YouTube Portal)",
+    "بوابة مايكروسوفت (Microsoft Compliance)",
+    "منصة إكس (X / Twitter Portal)",
+    "تيليجرام (Telegram Support)",
+    "تيك توك (TikTok Law Enforcement)",
+    "سناب شات (Snapchat Law Enforcement)",
+    "لينكد إن (LinkedIn Support)",
+    "ديسكورد (Discord Trust & Safety)",
+    "ريديت (Reddit Legal)",
+    "جيت هاب (GitHub Support)",
+    "آبل (Apple Legal / Support)",
+    "سامسونج (Samsung Security)",
+    "شاومي / هواوي / أوبو / فيفو",
+    "توصية عميل / إحالة رسمية",
+    "موقع شخصي وبوابة استقبال",
+    "أخرى"
+)
 val CURRENCIES = listOf("SAR", "USD", "EUR", "AED", "KWD")
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,6 +174,10 @@ fun CasesScreen(
     var formPriority by remember { mutableStateOf("عالية") }
     var formStatus by remember { mutableStateOf("جديدة") }
     var formInvestigator by remember { mutableStateOf("جعفر بدران (المسؤول الرئيسي)") }
+    var formExternalCaseId by remember { mutableStateOf("") }
+    var formSupportTicketId by remember { mutableStateOf("") }
+    var formTargetIdentifier by remember { mutableStateOf("") }
+    var formInternalCaseNumber by remember { mutableStateOf("") }
     var formNotes by remember { mutableStateOf("") }
     var formTotalAmount by remember { mutableStateOf("0") }
     var formCurrency by remember { mutableStateOf("SAR") }
@@ -139,13 +185,17 @@ fun CasesScreen(
 
     fun openNewCase() {
         caseToEdit = null
+        formInternalCaseNumber = viewModel.generateInternalCaseNumber()
         formTitle = ""
         formClientName = ""
-        formClientPhone = "+966"
+        formClientPhone = ""
         formThreatType = "طلب خدمة"
         formPriority = "عالية"
         formStatus = "جديدة"
         formInvestigator = "جعفر بدران (المسؤول الرئيسي)"
+        formExternalCaseId = ""
+        formSupportTicketId = ""
+        formTargetIdentifier = ""
         formNotes = ""
         formTotalAmount = "0"
         formCurrency = "SAR"
@@ -155,6 +205,7 @@ fun CasesScreen(
 
     fun openEditCase(item: CaseEntity) {
         caseToEdit = item
+        formInternalCaseNumber = item.caseNumber
         formTitle = item.title
         formClientName = item.clientName
         formClientPhone = item.clientPhone
@@ -162,6 +213,9 @@ fun CasesScreen(
         formPriority = item.priority
         formStatus = item.status
         formInvestigator = item.assignedInvestigator
+        formExternalCaseId = item.externalPlatformCaseId ?: ""
+        formSupportTicketId = item.supportTicketId ?: ""
+        formTargetIdentifier = item.targetIdentifier ?: ""
         formNotes = item.notes
         formTotalAmount = item.totalAmount.toInt().toString()
         formCurrency = item.currency
@@ -390,16 +444,61 @@ fun CasesScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = currentCase.caseNumber,
-                        color = CyberPrimaryLight,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
+                    Column {
+                        Text(
+                            text = currentCase.caseNumber,
+                            color = CyberPrimaryLight,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                        Text(
+                            text = "المرجع الداخلي المعتمد للنظام",
+                            color = TextSecondary,
+                            fontSize = 10.sp
+                        )
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         PriorityBadge(currentCase.priority)
                         Spacer(modifier = Modifier.width(6.dp))
                         StatusBadge(currentCase.status)
+                    }
+                }
+
+                // External Platform Reference IDs (if provided)
+                if (!currentCase.externalPlatformCaseId.isNullOrBlank() || !currentCase.supportTicketId.isNullOrBlank() || !currentCase.targetIdentifier.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CyberCardElevated),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            currentCase.externalPlatformCaseId.takeIf { it.isNotBlank() }?.let { extId ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Receipt, contentDescription = null, tint = CyberSecondary, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("معرف المنصة الخارجية: ", color = TextSecondary, fontSize = 11.sp)
+                                    Text(extId, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            currentCase.supportTicketId.takeIf { it.isNotBlank() }?.let { ticket ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Description, contentDescription = null, tint = CyberInfo, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("رقم تذكرة الدعم: ", color = TextSecondary, fontSize = 11.sp)
+                                    Text(ticket, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            currentCase.targetIdentifier.takeIf { it.isNotBlank() }?.let { target ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Share, contentDescription = null, tint = CyberWarning, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("المعرف / الرابط المستهدف: ", color = TextSecondary, fontSize = 11.sp)
+                                    Text(target, color = CyberPrimaryLight, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -617,16 +716,12 @@ fun CasesScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Attachments Count
-                Text("المرفقات والملفات المرتبطة (${caseEvidence.size}):", color = CyberSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
-                if (caseEvidence.isEmpty()) {
-                    Text("لم يتم ربط مرفقات أو ملفات بهذه القضية بعد.", color = TextMuted, fontSize = 12.sp)
-                } else {
-                    caseEvidence.forEach { evi ->
-                        Text("• ${evi.evidenceName} (SHA256: ${evi.sha256Hash.take(12)}...)", color = TextPrimary, fontSize = 12.sp)
-                    }
-                }
+                // Complete Case Evidence & Offline File System
+                CaseFilesSection(
+                    caseId = currentCase.id,
+                    caseNumber = currentCase.caseNumber,
+                    viewModel = viewModel
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -755,240 +850,460 @@ fun CasesScreen(
         )
     }
 
-    // Add / Edit Case Sheet
+    // Add / Edit Case Dialog (Non-swipeable, list-based selector UI)
     if (showEditorSheet) {
-        ModalBottomSheet(
+        var expandedThreatMenu by remember { mutableStateOf(false) }
+        var expandedSourceMenu by remember { mutableStateOf(false) }
+        var expandedPriorityMenu by remember { mutableStateOf(false) }
+        var expandedStatusMenu by remember { mutableStateOf(false) }
+
+        Dialog(
             onDismissRequest = { showEditorSheet = false },
-            containerColor = CyberSurface,
-            scrimColor = Color.Black.copy(alpha = 0.65f),
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            Column(
+            Card(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                    .verticalScroll(rememberScrollState())
+                    .fillMaxWidth(0.95f)
+                    .fillMaxHeight(0.92f),
+                colors = CardDefaults.cardColors(containerColor = CyberSurface),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.5f))
             ) {
-                Text(
-                    text = if (caseToEdit == null) "تسجيل قضية جديدة" else "تعديل بيانات القضية",
-                    color = TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                OutlinedTextField(
-                    value = formTitle,
-                    onValueChange = { formTitle = it },
-                    label = { Text("عنوان القضية / موضوع العمل") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = CyberPrimary,
-                        unfocusedBorderColor = CyberBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = formClientName,
-                    onValueChange = { formClientName = it },
-                    label = { Text("اسم العميل / صاحب الطلب") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = CyberPrimary,
-                        unfocusedBorderColor = CyberBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = formClientPhone,
-                    onValueChange = { formClientPhone = it },
-                    label = { Text("رقم هاتف العميل للاتصال والواتساب") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = CyberPrimary,
-                        unfocusedBorderColor = CyberBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Financial Fields
-                Text("الأتعاب والسعر المتفق عليه:", color = TextSecondary, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
                 ) {
-                    OutlinedTextField(
-                        value = formTotalAmount,
-                        onValueChange = { formTotalAmount = it },
-                        label = { Text("السعر الإجمالي") },
-                        modifier = Modifier.weight(1.5f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CyberSuccess,
-                            unfocusedBorderColor = CyberBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
+                    // Header with title and close button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (caseToEdit == null) "تسجيل قضية جديدة (قائمة منظمة)" else "تعديل بيانات القضية",
+                            color = TextPrimary,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(onClick = { showEditorSheet = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = TextMuted)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Internal Case Number Banner (Auto-generated & independent reference)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CyberCardElevated),
                         shape = RoundedCornerShape(10.dp),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = formCurrency,
-                        onValueChange = { formCurrency = it },
-                        label = { Text("العملة") },
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CyberPrimary,
-                            unfocusedBorderColor = CyberBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        singleLine = true
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text("مصدر القضية / الوصول للعميل:", color = TextSecondary, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    CASE_SOURCES.forEach { src ->
-                        FilterChip(
-                            selected = formCaseSource == src,
-                            onClick = { formCaseSource = src },
-                            label = { Text(src, fontSize = 11.sp) }
-                        )
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("معرف القضية الداخلي المعتمد (Case ID):", color = TextSecondary, fontSize = 11.sp)
+                                Text(
+                                    text = formInternalCaseNumber,
+                                    color = CyberPrimaryLight,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text("مرجع رقمي مستقل عن معرفات المنصات الخارجية", color = TextMuted, fontSize = 9.sp)
+                            }
+                            Row {
+                                if (caseToEdit == null) {
+                                    IconButton(
+                                        onClick = { formInternalCaseNumber = viewModel.generateInternalCaseNumber() },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = "توليد جديد", tint = CyberSecondary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                IconButton(
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("Case ID", formInternalCaseNumber)
+                                        clipboard?.setPrimaryClip(clip)
+                                        viewModel.showHud("تم نسخ معرف القضية الداخلي", HudType.INFO)
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "نسخ", tint = CyberPrimaryLight, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                Text("تصنيف القضية / نوع العمل:", color = TextSecondary, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    THREAT_TYPES.forEach { threat ->
-                        FilterChip(
-                            selected = formThreatType == threat,
-                            onClick = { formThreatType = threat },
-                            label = { Text(threat, fontSize = 11.sp) }
+                    // Form Fields List (Scrollable)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Title
+                        OutlinedTextField(
+                            value = formTitle,
+                            onValueChange = { formTitle = it },
+                            label = { Text("عنوان القضية / موضوع العمل *") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyberPrimary,
+                                unfocusedBorderColor = CyberBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp)
                         )
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                        // Threat / Purpose Type Selector (List Dropdown - No Drag)
+                        Text("تصنيف القضية / الغرض التقني المعتمد:", color = TextSecondary, fontSize = 12.sp)
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = CyberCardElevated),
+                                shape = RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder),
+                                onClick = { expandedThreatMenu = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(formThreatType, color = CyberPrimaryLight, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextMuted)
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = expandedThreatMenu,
+                                onDismissRequest = { expandedThreatMenu = false }
+                            ) {
+                                THREAT_TYPES.forEach { threat ->
+                                    DropdownMenuItem(
+                                        text = { Text(threat, fontSize = 13.sp) },
+                                        onClick = {
+                                            formThreatType = threat
+                                            expandedThreatMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
 
-                Text("مستوى الأولوية:", color = TextSecondary, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PRIORITIES.forEach { p ->
-                        FilterChip(
-                            selected = formPriority == p,
-                            onClick = { formPriority = p },
-                            label = { Text(p, fontSize = 11.sp) }
+                        // Case Source / Platform Gateway Selector (List Dropdown - No Drag)
+                        Text("بوابة ومصدر القضية / المنصة المعنية:", color = TextSecondary, fontSize = 12.sp)
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = CyberCardElevated),
+                                shape = RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder),
+                                onClick = { expandedSourceMenu = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(formCaseSource, color = CyberSecondary, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextMuted)
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = expandedSourceMenu,
+                                onDismissRequest = { expandedSourceMenu = false }
+                            ) {
+                                CASE_SOURCES.forEach { src ->
+                                    DropdownMenuItem(
+                                        text = { Text(src, fontSize = 13.sp) },
+                                        onClick = {
+                                            formCaseSource = src
+                                            expandedSourceMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // External References Group
+                        Text("معرفات المنصات الخارجية وتذاكر الدعم (اختياري):", color = CyberInfo, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        OutlinedTextField(
+                            value = formExternalCaseId,
+                            onValueChange = { formExternalCaseId = it },
+                            label = { Text("معرف القضية بالمنصة الخارجية (Meta, Google, X, etc.)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyberSecondary,
+                                unfocusedBorderColor = CyberBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
                         )
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = formSupportTicketId,
+                            onValueChange = { formSupportTicketId = it },
+                            label = { Text("رقم تذكرة الدعم الفني أو البلاغ") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyberInfo,
+                                unfocusedBorderColor = CyberBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
 
-                OutlinedTextField(
-                    value = formNotes,
-                    onValueChange = { formNotes = it },
-                    label = { Text("ملاحظات وتفاصيل العمل والمتابعة") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = CyberPrimary,
-                        unfocusedBorderColor = CyberBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                )
+                        OutlinedTextField(
+                            value = formTargetIdentifier,
+                            onValueChange = { formTargetIdentifier = it },
+                            label = { Text("المعرف المستهدف (@username / الرابط / الهاتف)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyberWarning,
+                                unfocusedBorderColor = CyberBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                        // Client Details
+                        Text("بيانات العميل / صاحب الطلب:", color = TextSecondary, fontSize = 12.sp)
+                        OutlinedTextField(
+                            value = formClientName,
+                            onValueChange = { formClientName = it },
+                            label = { Text("اسم العميل *") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyberPrimary,
+                                unfocusedBorderColor = CyberBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
 
-                Button(
-                    onClick = {
-                        if (formTitle.isNotBlank() && formClientName.isNotBlank()) {
-                            val isNew = caseToEdit == null
-                            val id = caseToEdit?.id ?: "case_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}"
-                            val num = caseToEdit?.caseNumber ?: "JB-2026-${(1000..9999).random()}"
-                            val parsedPrice = formTotalAmount.toDoubleOrNull() ?: 0.0
-                            val existingPaid = caseToEdit?.paidAmount ?: 0.0
-                            val calculatedRemaining = maxOf(0.0, parsedPrice - existingPaid)
-                            val calcPaymentStatus = when {
-                                parsedPrice == 0.0 -> "غير مدفوع"
-                                existingPaid >= parsedPrice -> "مدفوع بالكامل"
-                                existingPaid > 0.0 -> "مدفوع جزئيًا"
-                                else -> "غير مدفوع"
+                        OutlinedTextField(
+                            value = formClientPhone,
+                            onValueChange = { formClientPhone = it },
+                            label = { Text("رقم هاتف العميل") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyberPrimary,
+                                unfocusedBorderColor = CyberBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+
+                        // Priority and Status (Dropdowns)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Priority Box
+                            Box(modifier = Modifier.weight(1f)) {
+                                OutlinedButton(
+                                    onClick = { expandedPriorityMenu = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("الأولوية:", fontSize = 10.sp, color = TextMuted)
+                                        Text(formPriority, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                    }
+                                }
+                                DropdownMenu(
+                                    expanded = expandedPriorityMenu,
+                                    onDismissRequest = { expandedPriorityMenu = false }
+                                ) {
+                                    PRIORITIES.forEach { p ->
+                                        DropdownMenuItem(
+                                            text = { Text(p, fontSize = 13.sp) },
+                                            onClick = {
+                                                formPriority = p
+                                                expandedPriorityMenu = false
+                                            }
+                                        )
+                                    }
+                                }
                             }
 
-                            val entity = CaseEntity(
-                                id = id,
-                                caseNumber = num,
-                                title = formTitle,
-                                clientName = formClientName,
-                                clientPhone = formClientPhone,
-                                threatType = formThreatType,
-                                priority = formPriority,
-                                status = formStatus,
-                                assignedInvestigator = formInvestigator,
-                                timelineEventsJson = caseToEdit?.timelineEventsJson ?: "[{\"time\":\"${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())}\",\"event\":\"فتح ملف القضية وتسجيل الطلب\"}]",
-                                notes = formNotes,
-                                createdDate = caseToEdit?.createdDate ?: System.currentTimeMillis(),
-                                totalAmount = parsedPrice,
-                                paidAmount = existingPaid,
-                                remainingAmount = calculatedRemaining,
-                                currency = formCurrency.ifBlank { "SAR" },
-                                paymentStatus = calcPaymentStatus,
-                                source = formCaseSource
-                            )
-                            viewModel.saveCase(entity, isNew)
-                            showEditorSheet = false
-                        } else {
-                            viewModel.showHud("يرجى ملء عنوان القضية واسم العميل", HudType.WARNING)
+                            // Status Box
+                            Box(modifier = Modifier.weight(1f)) {
+                                OutlinedButton(
+                                    onClick = { expandedStatusMenu = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("الحالة:", fontSize = 10.sp, color = TextMuted)
+                                        Text(formStatus, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                    }
+                                }
+                                DropdownMenu(
+                                    expanded = expandedStatusMenu,
+                                    onDismissRequest = { expandedStatusMenu = false }
+                                ) {
+                                    listOf("جديدة", "قيد المراجعة", "قيد المعالجة", "بانتظار المعلومات", "قيد المتابعة", "مكتملة", "مغلقة").forEach { st ->
+                                        DropdownMenuItem(
+                                            text = { Text(st, fontSize = 13.sp) },
+                                            onClick = {
+                                                formStatus = st
+                                                expandedStatusMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(
-                        text = if (caseToEdit == null) "تسجيل القضية رسمياً" else "حفظ تعديلات القضية",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                        // Financial Fields
+                        Text("الأتعاب والسعر المتفق عليه:", color = TextSecondary, fontSize = 12.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = formTotalAmount,
+                                onValueChange = { formTotalAmount = it },
+                                label = { Text("المبلغ الإجمالي") },
+                                modifier = Modifier.weight(1.5f),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = CyberSuccess,
+                                    unfocusedBorderColor = CyberBorder,
+                                    focusedTextColor = TextPrimary,
+                                    unfocusedTextColor = TextPrimary
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+
+                            OutlinedTextField(
+                                value = formCurrency,
+                                onValueChange = { formCurrency = it },
+                                label = { Text("العملة") },
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = CyberPrimary,
+                                    unfocusedBorderColor = CyberBorder,
+                                    focusedTextColor = TextPrimary,
+                                    unfocusedTextColor = TextPrimary
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+                        }
+
+                        // Notes
+                        OutlinedTextField(
+                            value = formNotes,
+                            onValueChange = { formNotes = it },
+                            label = { Text("ملاحظات وتفاصيل العمل والمتابعة") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(90.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyberPrimary,
+                                unfocusedBorderColor = CyberBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Dialog Actions (Buttons)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showEditorSheet = false },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("إلغاء")
+                        }
+
+                        Button(
+                            onClick = {
+                                if (formTitle.isNotBlank() && formClientName.isNotBlank()) {
+                                    val isNew = caseToEdit == null
+                                    val id = caseToEdit?.id ?: "case_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}"
+                                    val num = if (formInternalCaseNumber.isNotBlank()) formInternalCaseNumber.trim() else (caseToEdit?.caseNumber ?: viewModel.generateInternalCaseNumber())
+                                    val parsedPrice = formTotalAmount.toDoubleOrNull() ?: 0.0
+                                    val existingPaid = caseToEdit?.paidAmount ?: 0.0
+                                    val calculatedRemaining = maxOf(0.0, parsedPrice - existingPaid)
+                                    val calcPaymentStatus = when {
+                                        parsedPrice == 0.0 -> "غير مدفوع"
+                                        existingPaid >= parsedPrice -> "مدفوع بالكامل"
+                                        existingPaid > 0.0 -> "مدفوع جزئيًا"
+                                        else -> "غير مدفوع"
+                                    }
+
+                                    val entity = CaseEntity(
+                                        id = id,
+                                        caseNumber = num,
+                                        title = formTitle.trim(),
+                                        clientName = formClientName.trim(),
+                                        clientPhone = formClientPhone.trim(),
+                                        threatType = formThreatType,
+                                        priority = formPriority,
+                                        status = formStatus,
+                                        assignedInvestigator = formInvestigator,
+                                        timelineEventsJson = caseToEdit?.timelineEventsJson ?: "[{\"time\":\"${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())}\",\"event\":\"فتح ملف القضية وتسجيل الطلب\"}]",
+                                        notes = formNotes.trim(),
+                                        createdDate = caseToEdit?.createdDate ?: System.currentTimeMillis(),
+                                        totalAmount = parsedPrice,
+                                        paidAmount = existingPaid,
+                                        remainingAmount = calculatedRemaining,
+                                        currency = formCurrency.ifBlank { "SAR" },
+                                        paymentStatus = calcPaymentStatus,
+                                        source = formCaseSource,
+                                        externalPlatformCaseId = formExternalCaseId.trim(),
+                                        supportTicketId = formSupportTicketId.trim(),
+                                        targetIdentifier = formTargetIdentifier.trim()
+                                    )
+                                    viewModel.saveCase(entity, isNew)
+                                    showEditorSheet = false
+                                } else {
+                                    viewModel.showHud("يرجى إدخال عنوان القضية واسم العميل", HudType.WARNING)
+                                }
+                            },
+                            modifier = Modifier.weight(1.5f),
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = if (caseToEdit == null) "تسجيل القضية رسمياً" else "حفظ تعديلات القضية",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
         }
     }

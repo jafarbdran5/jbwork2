@@ -27,6 +27,14 @@ import com.example.data.local.entities.SupportFormEntity
 import com.example.data.local.entities.TaskEntity
 import com.example.data.local.entities.VideoIdeaEntity
 import com.example.data.local.entities.VideoScriptEntity
+import com.example.data.local.entities.AdminAuditLogEntity
+import com.example.data.local.entities.AppSectionConfigEntity
+import com.example.data.local.entities.CustomFieldDefinitionEntity
+import com.example.data.local.entities.SystemCategoryEntity
+import com.example.data.local.entities.SystemExpenseEntity
+import com.example.data.local.entities.OfficialSourceEntity
+import com.example.data.local.entities.ProfitShareRuleEntity
+import com.example.data.local.entities.FinancialRevenueEntity
 import com.example.data.remote.SheetReadResult
 import com.example.data.repository.ExternalRequestsRepository
 import com.example.data.repository.ForensicRepository
@@ -169,6 +177,25 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     val externalRequestActiveTab = MutableStateFlow("الكل")
     val externalRequestsAutoSyncInterval = MutableStateFlow("إيقاف")
 
+    // Admin System Management State
+    val appSections = repository.allSectionConfigs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val visibleAppSections = repository.visibleSectionConfigs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val customFields = repository.allCustomFields.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val systemExpenses = repository.allExpenses.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val systemCategories = repository.allCategories.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val adminAuditLogs = repository.adminAuditLogs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val isAdminModeActive = MutableStateFlow(true)
+    val topBarTitle = MutableStateFlow("منظومة جعفر بدران")
+    val topBarSubtitle = MutableStateFlow("إدارة العمل والقضايا والطلبات")
+
+    val profitSplitTeam = MutableStateFlow(20f)
+    val profitSplitWork = MutableStateFlow(70f)
+    val profitSplitReserve = MutableStateFlow(10f)
+
+    val expenseSearchQuery = MutableStateFlow("")
+    val expenseCategoryFilter = MutableStateFlow("الكل")
+
     init {
         viewModelScope.launch {
             val savedTheme = repository.getSetting("app_theme")
@@ -199,6 +226,17 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
             if (savedBio != null) {
                 _isBiometricHardwareEnabled.value = (savedBio == "true")
             }
+            val savedTitle = repository.getSettingValue("system_topbar_title", "منظومة جعفر بدران")
+            topBarTitle.value = savedTitle
+            val savedSub = repository.getSettingValue("system_topbar_subtitle", "إدارة العمل والقضايا والطلبات")
+            topBarSubtitle.value = savedSub
+            val savedTeamSplit = repository.getSettingValue("profit_split_team", "20").toFloatOrNull() ?: 20f
+            profitSplitTeam.value = savedTeamSplit
+            val savedWorkSplit = repository.getSettingValue("profit_split_work", "70").toFloatOrNull() ?: 70f
+            profitSplitWork.value = savedWorkSplit
+            val savedResSplit = repository.getSettingValue("profit_split_reserve", "10").toFloatOrNull() ?: 10f
+            profitSplitReserve.value = savedResSplit
+
             if (_isLockEnabled.value) {
                 _isBiometricUnlocked.value = false
             }
@@ -219,6 +257,58 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     val rawVideoIdeas = repository.allVideoIdeas.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val rawVideoScripts = repository.allVideoScripts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val auditLogs = repository.recentAuditLogs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Official Sources & Law Enforcement & Partner Portals Streams
+    val rawOfficialSources = repository.allOfficialSources.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val officialSourceSearchQuery = MutableStateFlow("")
+    val officialSourceSectionFilter = MutableStateFlow("الكل")
+    val officialSourceCategoryFilter = MutableStateFlow("الكل")
+    val officialSourceFavoritesOnly = MutableStateFlow(false)
+
+    val filteredOfficialSources: StateFlow<List<OfficialSourceEntity>> = combine(
+        rawOfficialSources,
+        officialSourceSearchQuery,
+        officialSourceSectionFilter,
+        officialSourceCategoryFilter,
+        officialSourceFavoritesOnly
+    ) { sources, query, section, category, favOnly ->
+        sources.filter { source ->
+            val matchesQuery = query.isBlank() ||
+                source.name.contains(query, ignoreCase = true) ||
+                source.companyOrEntity.contains(query, ignoreCase = true) ||
+                source.description.contains(query, ignoreCase = true) ||
+                source.officialUrl.contains(query, ignoreCase = true) ||
+                source.requirements.contains(query, ignoreCase = true) ||
+                source.category.contains(query, ignoreCase = true) ||
+                source.region.contains(query, ignoreCase = true)
+            val matchesSection = section == "الكل" || source.sectionType == section
+            val matchesCategory = category == "الكل" || source.category == category
+            val matchesFav = !favOnly || source.isFavorite
+            matchesQuery && matchesSection && matchesCategory && matchesFav
+        }.sortedWith(compareBy({ !it.isFavorite }, { it.sortOrder }, { it.companyOrEntity }))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Profit Rules & Financial Revenues Streams
+    val rawProfitRules = repository.allProfitRules.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val rawFinancialRevenues = repository.allFinancialRevenues.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val financialRevenueSearchQuery = MutableStateFlow("")
+    val financialRevenueTypeFilter = MutableStateFlow("الكل")
+
+    val filteredFinancialRevenues: StateFlow<List<FinancialRevenueEntity>> = combine(
+        rawFinancialRevenues,
+        financialRevenueSearchQuery,
+        financialRevenueTypeFilter
+    ) { revenues, query, type ->
+        revenues.filter { rev ->
+            val matchesQuery = query.isBlank() ||
+                rev.title.contains(query, ignoreCase = true) ||
+                rev.clientName.contains(query, ignoreCase = true) ||
+                (rev.caseNumber ?: "").contains(query, ignoreCase = true) ||
+                rev.notes.contains(query, ignoreCase = true)
+            val matchesType = type == "الكل" || rev.incomeType == type
+            matchesQuery && matchesType
+        }.sortedByDescending { it.timestamp }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val isCloudSyncing = repository.isCloudSyncing
     val lastSyncTimestamp = repository.lastSyncTimestamp
@@ -280,14 +370,14 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
             val matchesCategory = category == "الكل" || tool.category.contains(category, ignoreCase = true) || tool.subcategory.contains(category, ignoreCase = true)
             val matchesCost = cost == "الكل" || tool.freeOrPaid.contains(cost, ignoreCase = true)
             val matchesTab = when (tab) {
-                1 -> tool.isFavorite
-                2 -> tool.lastUsedAt != null
+                2 -> tool.isFavorite
+                3 -> tool.lastUsedAt != null
                 else -> true
             }
 
             matchesQuery && matchesCategory && matchesCost && matchesTab
         }
-        if (tab == 2) filtered.sortedByDescending { it.lastUsedAt ?: 0L } else filtered
+        if (tab == 3) filtered.sortedByDescending { it.lastUsedAt ?: 0L } else filtered
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
@@ -788,6 +878,31 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun logVerificationToCase(caseId: String, checkType: String, target: String, toolName: String) {
+        viewModelScope.launch {
+            val caseItem = repository.getCaseById(caseId) ?: return@launch
+            val now = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+            val eventText = "فحص أمني ($checkType) عبر [$toolName] للهدف: $target"
+            val newJson = try {
+                val array = org.json.JSONArray(caseItem.timelineEventsJson)
+                val obj = org.json.JSONObject()
+                obj.put("time", now)
+                obj.put("event", eventText)
+                array.put(obj)
+                array.toString()
+            } catch (e: Exception) {
+                "[{\"time\":\"$now\",\"event\":\"$eventText\"}]"
+            }
+            val updated = caseItem.copy(
+                timelineEventsJson = newJson,
+                targetIdentifier = if (caseItem.targetIdentifier.isBlank()) target else caseItem.targetIdentifier,
+                updatedDate = System.currentTimeMillis()
+            )
+            repository.insertOrUpdateCase(updated, isNew = false)
+            showHud("تم توثيق فحص ($checkType) في سجل القضية ${caseItem.caseNumber}", HudType.SUCCESS)
+        }
+    }
+
     fun duplicateCase(sourceCaseId: String) {
         viewModelScope.launch {
             val res = repository.duplicateCase(sourceCaseId, performedBy = _currentRole.value)
@@ -893,10 +1008,86 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun getEvidenceForCase(caseId: String) = repository.getEvidenceForCase(caseId)
+
+    fun getDeletedEvidenceForCase(caseId: String) = repository.getDeletedEvidenceForCase(caseId)
+
+    fun generateInternalCaseNumber(): String {
+        val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val rand = (100000..999999).random()
+        return "JB-$year-$rand"
+    }
+
+    fun attachCaseOfflineFile(
+        caseId: String,
+        caseNumber: String,
+        fileName: String,
+        fileType: String,
+        originalFilename: String,
+        localPath: String,
+        fileSizeBytes: Long,
+        fileSizeFormatted: String,
+        mimeType: String,
+        sha256: String,
+        md5: String,
+        notes: String
+    ) {
+        viewModelScope.launch {
+            val evidence = EvidenceEntity(
+                id = "evi_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+                caseId = caseId,
+                caseNumber = caseNumber,
+                evidenceName = fileName,
+                fileType = fileType,
+                originalFilename = originalFilename,
+                md5Hash = md5,
+                sha256Hash = sha256,
+                exifDeviceModel = "حفظ محلي مشفر",
+                exifSoftware = "Jaffar Forensic Core",
+                exifGpsCoords = "تخزين محلي بدون إنترنت",
+                exifTimestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()),
+                chainOfCustodyLog = "تم الفحص والتوثيق محلياً بواسطة ${_currentRole.value}",
+                notes = notes,
+                localFilePath = localPath,
+                fileSizeBytes = fileSizeBytes,
+                fileSizeFormatted = fileSizeFormatted,
+                mimeType = mimeType
+            )
+            repository.insertOrUpdateEvidence(evidence, isNew = true)
+            showHud("تم إدراج وتوثيق الملف محلياً واستخراج البصمات", HudType.SUCCESS)
+        }
+    }
+
+    fun softDeleteCaseFile(evidenceId: String, fileName: String) {
+        viewModelScope.launch {
+            repository.softDeleteEvidence(evidenceId, fileName)
+            showHud("تم نقل الملف إلى سلة محذوفات القضية", HudType.WARNING)
+        }
+    }
+
+    fun restoreCaseFile(evidenceId: String, fileName: String) {
+        viewModelScope.launch {
+            repository.restoreEvidence(evidenceId, fileName)
+            showHud("تم استعادة الملف بنجاح إلى القضية", HudType.SUCCESS)
+        }
+    }
+
+    fun permanentlyDeleteCaseFile(evidenceId: String, fileName: String, filePath: String?) {
+        viewModelScope.launch {
+            if (!filePath.isNullOrBlank()) {
+                try {
+                    java.io.File(filePath).delete()
+                } catch (_: Exception) {}
+            }
+            repository.permanentDeleteEvidence(evidenceId, fileName)
+            showHud("تم التطهير والحذف النهائي للملف", HudType.SUCCESS)
+        }
+    }
+
     fun deleteEvidence(evidence: EvidenceEntity) {
         viewModelScope.launch {
             repository.softDeleteEvidence(evidence.id, evidence.evidenceName)
-            showHud("تم حذف المرفق", HudType.WARNING)
+            showHud("تم نقل المرفق إلى سلة المحذوفات", HudType.WARNING)
         }
     }
 
@@ -1488,6 +1679,260 @@ $sectionNumber التوصية الفنية والإجرائية:
 
             showHud("تم تحويل الطلب إلى قضية رسمية بنجاح ($caseNumber)", HudType.SUCCESS)
             onSuccess(caseEntity)
+        }
+    }
+
+    // ==========================================
+    // ADMIN MODE: FULL SYSTEM CONTROL METHODS
+    // ==========================================
+
+    fun toggleAdminMode(enabled: Boolean) {
+        _currentRole.value = if (enabled) "مدير عام (جعفر بدران)" else "مسؤول متابعة القضايا"
+        isAdminModeActive.value = enabled
+        showHud(if (enabled) "تم تفعيل وضع الإدارة الكامل (جعفر بدران)" else "تم إغلاق وضع الإدارة", HudType.INFO)
+    }
+
+    // App Section Management
+    fun saveSectionConfig(section: AppSectionConfigEntity) {
+        viewModelScope.launch {
+            repository.saveSectionConfig(section)
+            showHud("تم حفظ إعدادات قسم: ${section.displayName}", HudType.SUCCESS)
+        }
+    }
+
+    fun toggleSectionVisibility(id: String, isVisible: Boolean, name: String) {
+        viewModelScope.launch {
+            repository.toggleSectionVisibility(id, isVisible, name)
+            showHud(if (isVisible) "تم إظهار قسم $name" else "تم إخفاء قسم $name", HudType.INFO)
+        }
+    }
+
+    fun deleteCustomSection(id: String, name: String) {
+        viewModelScope.launch {
+            repository.deleteCustomSection(id, name)
+            showHud("تم حذف القسم المخصص: $name", HudType.WARNING)
+        }
+    }
+
+    // Custom Fields Management
+    fun saveCustomField(field: CustomFieldDefinitionEntity) {
+        viewModelScope.launch {
+            repository.saveCustomField(field)
+            showHud("تم حفظ الحقل المخصص: ${field.fieldName}", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteCustomField(id: String, fieldName: String) {
+        viewModelScope.launch {
+            repository.deleteCustomField(id, fieldName)
+            showHud("تم حذف الحقل المخصص: $fieldName", HudType.WARNING)
+        }
+    }
+
+    // System Expenses
+    fun saveExpense(expense: SystemExpenseEntity, isNew: Boolean = false) {
+        viewModelScope.launch {
+            repository.saveExpense(expense, isNew)
+            showHud(if (isNew) "تم تسجيل المصروف بنجاح" else "تم تحديث بيانات المصروف", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteExpense(id: String, title: String) {
+        viewModelScope.launch {
+            repository.softDeleteExpense(id, title)
+            showHud("تم حذف المصروف: $title", HudType.WARNING)
+        }
+    }
+
+    // System Categories
+    fun saveCategory(category: SystemCategoryEntity) {
+        viewModelScope.launch {
+            repository.saveCategory(category)
+            showHud("تم حفظ التصنيف: ${category.name}", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteCategory(id: String, name: String) {
+        viewModelScope.launch {
+            repository.deleteCategory(id, name)
+            showHud("تم حذف التصنيف: $name", HudType.WARNING)
+        }
+    }
+
+    // Profit Split Rules
+    fun updateProfitSplit(team: Float, work: Float, reserve: Float) {
+        viewModelScope.launch {
+            profitSplitTeam.value = team
+            profitSplitWork.value = work
+            profitSplitReserve.value = reserve
+            repository.saveSettingValue("profit_split_team", team.toString())
+            repository.saveSettingValue("profit_split_work", work.toString())
+            repository.saveSettingValue("profit_split_reserve", reserve.toString())
+            showHud("تم تحديث نسب توزيع الأرباح بنجاح", HudType.SUCCESS)
+        }
+    }
+
+    // Top Bar Customization
+    fun updateTopBarSettings(title: String, subtitle: String) {
+        viewModelScope.launch {
+            topBarTitle.value = title.trim().ifBlank { "منظومة جعفر بدران" }
+            topBarSubtitle.value = subtitle.trim().ifBlank { "إدارة العمل والقضايا والطلبات" }
+            repository.saveSettingValue("system_topbar_title", topBarTitle.value)
+            repository.saveSettingValue("system_topbar_subtitle", topBarSubtitle.value)
+            showHud("تم تحديث ترويسة المنظومة بنجاح", HudType.SUCCESS)
+        }
+    }
+
+    // Full Case Modification
+    fun updateFullCase(case: CaseEntity) {
+        viewModelScope.launch {
+            repository.insertOrUpdateCase(case, isNew = false)
+            repository.logAdminAction(
+                action = "تعديل إداري شامل للقضية",
+                target = "${case.caseNumber} - ${case.title}",
+                newValue = "الحالة: ${case.status} | المالي: ${case.totalAmount} SAR | العميل: ${case.clientName}"
+            )
+            showHud("تم تحديث بيانات القضية بالكامل (${case.caseNumber})", HudType.SUCCESS)
+        }
+    }
+
+    // Full Client Modification
+    fun updateFullClient(client: ClientEntity) {
+        viewModelScope.launch {
+            repository.insertOrUpdateClient(client, isNew = false)
+            repository.logAdminAction(
+                action = "تعديل إداري لبيانات العميل",
+                target = client.fullName,
+                newValue = "الهاتف: ${client.phoneNumber} | المخاطر: ${client.riskLevel}"
+            )
+            showHud("تم تحديث بيانات العميل بنجاح", HudType.SUCCESS)
+        }
+    }
+
+    // Investigation Tools Administration
+    fun saveInvestigationTool(tool: InvestigationToolEntity) {
+        viewModelScope.launch {
+            database.investigationToolDao().insertOrUpdate(tool)
+            repository.logAdminAction(
+                action = "إضافة/تعديل أداة تقصي",
+                target = tool.name,
+                newValue = "${tool.category} | ${tool.url}"
+            )
+            showHud("تم حفظ الأداة بنجاح: ${tool.name}", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteInvestigationTool(id: String, name: String) {
+        viewModelScope.launch {
+            database.investigationToolDao().permanentDelete(id)
+            repository.logAdminAction(
+                action = "حذف أداة تقصي",
+                target = name,
+                oldValue = id,
+                newValue = "تم الحذف"
+            )
+            showHud("تم حذف الأداة: $name", HudType.WARNING)
+        }
+    }
+
+    // Support Forms Administration
+    fun saveSupportForm(form: SupportFormEntity) {
+        viewModelScope.launch {
+            database.supportFormDao().insertOrUpdate(form)
+            repository.logAdminAction(
+                action = "إضافة/تعديل نموذج دعم",
+                target = form.formName,
+                newValue = "${form.company} | ${form.formUrl}"
+            )
+            showHud("تم حفظ نموذج الدعم: ${form.formName}", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteSupportForm(id: String, name: String) {
+        viewModelScope.launch {
+            database.supportFormDao().permanentDelete(id)
+            repository.logAdminAction(
+                action = "حذف نموذج دعم",
+                target = name,
+                oldValue = id,
+                newValue = "تم الحذف"
+            )
+            showHud("تم حذف نموذج الدعم: $name", HudType.WARNING)
+        }
+    }
+
+    // Official Sources Management
+    fun saveOfficialSource(source: OfficialSourceEntity, isNew: Boolean = false) {
+        viewModelScope.launch {
+            repository.insertOrUpdateOfficialSource(source)
+            showHud(if (isNew) "تمت إضافة البوابة/المصدر بنجاح" else "تم تحديث بيانات المصدر", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteOfficialSource(id: String, name: String) {
+        viewModelScope.launch {
+            repository.deleteOfficialSource(id, name)
+            showHud("تم حذف المصدر: $name", HudType.WARNING)
+        }
+    }
+
+    fun toggleOfficialSourceVisibility(id: String, isVisible: Boolean) {
+        viewModelScope.launch {
+            repository.toggleOfficialSourceVisibility(id, isVisible)
+            showHud(if (isVisible) "تم إظهار المصدر" else "تم إخفاء المصدر", HudType.INFO)
+        }
+    }
+
+    fun toggleOfficialSourceFavorite(id: String, isFavorite: Boolean) {
+        viewModelScope.launch {
+            repository.toggleOfficialSourceFavorite(id, isFavorite)
+        }
+    }
+
+    // Profit Share Rules Management
+    fun saveProfitRule(rule: ProfitShareRuleEntity, isNew: Boolean = false) {
+        viewModelScope.launch {
+            repository.insertOrUpdateProfitRule(rule)
+            showHud(if (isNew) "تمت إضافة بند توزيع الأرباح بنجاح" else "تم تحديث بند الأرباح", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteProfitRule(id: String, name: String) {
+        viewModelScope.launch {
+            repository.deleteProfitRule(id, name)
+            showHud("تم حذف بند توزيع الأرباح: $name", HudType.WARNING)
+        }
+    }
+
+    // Financial Revenues Management
+    fun saveFinancialRevenue(revenue: FinancialRevenueEntity, isNew: Boolean = false) {
+        viewModelScope.launch {
+            repository.insertOrUpdateRevenue(revenue)
+            showHud(if (isNew) "تم تسجيل الإيراد بنجاح" else "تم تحديث بيانات الإيراد", HudType.SUCCESS)
+        }
+    }
+
+    fun deleteFinancialRevenue(id: String, title: String) {
+        viewModelScope.launch {
+            repository.deleteRevenue(id, title)
+            showHud("تم حذف الإيراد: $title", HudType.WARNING)
+        }
+    }
+
+    // Backup & Restore
+    suspend fun exportSystemBackupJson(): String {
+        return repository.exportCompleteBackupJson()
+    }
+
+    fun restoreSystemBackup(json: String, mergeMode: Boolean, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val result = repository.restoreBackupFromJson(json, mergeMode)
+            if (result.first) {
+                showHud("تمت استعادة المنظومة بنجاح", HudType.SUCCESS)
+            } else {
+                showHud("فشل استيراد النسخة الاحتياطية", HudType.ERROR)
+            }
+            onResult(result.first, result.second)
         }
     }
 }

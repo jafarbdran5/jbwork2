@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.CloudDone
@@ -83,15 +84,19 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     viewModel: ForensicViewModel,
-    onNavigateToTrash: () -> Unit
+    onNavigateToTrash: () -> Unit,
+    onNavigateToAdmin: () -> Unit = {}
 ) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val isScreenshotProtected by viewModel.isScreenshotProtection.collectAsState()
     val isBiometricUnlocked by viewModel.isBiometricUnlocked.collectAsState()
     val currentRole by viewModel.currentRole.collectAsState()
+    val isAdminModeActive by viewModel.isAdminModeActive.collectAsState()
     val isSyncing by viewModel.isCloudSyncing.collectAsState()
     val lastSync by viewModel.lastSyncTimestamp.collectAsState()
     val pendingSyncCount by viewModel.pendingSyncCount.collectAsState()
+
+    val isAuthorizedAdmin = isAdminModeActive || currentRole.contains("جعفر بدران") || currentRole.contains("مدير")
 
     var sheetIdInput by remember { mutableStateOf(viewModel.sheetId.value) }
     var webAppUrlInput by remember { mutableStateOf(viewModel.webAppUrl.value) }
@@ -118,6 +123,105 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp
             )
+        }
+
+        // ==============================================================
+        // ADMIN MODE: إدارة المنظومة (خاص بالمدير الرئيسي: جعفر بدران)
+        // ==============================================================
+        if (isAuthorizedAdmin) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.5.dp, CyberPrimary, RoundedCornerShape(14.dp)),
+                    colors = CardDefaults.cardColors(containerColor = CyberCardElevated),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(CyberPrimary.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.SupervisorAccount,
+                                        contentDescription = null,
+                                        tint = CyberPrimaryLight,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "إدارة المنظومة",
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "خاص بالمدير الرئيسي (جعفر بدران) — تحكم كامل في كل شيء",
+                                        color = CyberPrimaryLight,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(CyberSuccess.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "صلاحية المدير",
+                                    color = CyberSuccess,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "من خلال هذا القسم يمكنك إضافة وتعديل وحذف وإخفاء وإظهار الأقسام، نماذج الدعم، الأدوات، الحقول المخصصة، والمصروفات، بالإضافة إلى ضبط نسب توزيع الأرباح واستعادة النسخ الاحتياطية بدون تعديل الكود.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = onNavigateToAdmin,
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AdminPanelSettings,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "فتح لوحة إدارة المنظومة",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // Appearance Section

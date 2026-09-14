@@ -51,6 +51,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -216,28 +218,98 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
             }
         }
 
-        // Case Selector
+        // Case Selector - Displayed as a clean vertical list (لا بالسحب)
         if (selectedReportType != "الملخص التنفيذي العام" && cases.isNotEmpty()) {
             item {
-                Text("القضية المستهدفة:", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "القضية المستهدفة (اختر من القائمة المباشرة):",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${cases.size} قضية",
+                        color = CyberPrimaryLight,
+                        fontSize = 11.sp
+                    )
+                }
                 Spacer(modifier = Modifier.height(6.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(cases) { c ->
-                        val isSelected = selectedCase?.id == c.id
-                        Box(
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    cases.forEach { c ->
+                        val isSelected = (selectedCase?.id == c.id)
+                        Card(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) CyberSecondary else MaterialTheme.colorScheme.surfaceVariant)
-                                .border(1.dp, if (isSelected) CyberSecondary else CyberBorder, RoundedCornerShape(10.dp))
-                                .clickable { selectedCaseId = c.id }
-                                .padding(horizontal = 12.dp, vertical = 7.dp)
-                        ) {
-                            Text(
-                                text = "${c.caseNumber} - ${c.clientName}",
-                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                .fillMaxWidth()
+                                .clickable { selectedCaseId = c.id },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) CyberPrimary.copy(alpha = 0.12f) else CyberCard
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) CyberPrimary else CyberBorder
                             )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { selectedCaseId = c.id },
+                                        colors = RadioButtonDefaults.colors(
+                                            selectedColor = CyberPrimary,
+                                            unselectedColor = Color.Gray
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = c.caseNumber,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = if (isSelected) CyberPrimaryLight else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            CyberBadge(
+                                                text = c.status,
+                                                accentColor = when (c.status) {
+                                                    "قيد التحقيق" -> CyberWarning
+                                                    "تم الحل بنجاح" -> CyberSuccess
+                                                    "عاجلة" -> CyberDanger
+                                                    else -> CyberInfo
+                                                }
+                                            )
+                                        }
+                                        Text(
+                                            text = "${c.clientName} — ${c.title}",
+                                            fontSize = 11.sp,
+                                            color = TextSecondary,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+
+                                if (isSelected) {
+                                    CyberBadge(text = "مختارة للتقرير", accentColor = CyberSuccess)
+                                }
+                            }
                         }
                     }
                 }
