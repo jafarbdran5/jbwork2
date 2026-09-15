@@ -78,7 +78,9 @@ data class EvidenceEntity(
     val localFilePath: String = "", // مسار الحفظ المحلي في ذاكرة التطبيق
     val fileSizeBytes: Long = 0L, // حجم الملف بالبايت
     val fileSizeFormatted: String = "0 KB", // حجم الملف منسق
-    val mimeType: String = "" // نوع MIME للملف
+    val mimeType: String = "", // نوع MIME للملف
+    val category: String = "مستندات", // صور، مستندات، مراسلات، تقارير، مرفقات العميل، مرفقات المنصة، فواتير، أخرى
+    val description: String = "" // وصف تفصيلي للملف ومحتواه
 )
 
 @Entity(tableName = "content_studio")

@@ -278,6 +278,17 @@ class ForensicRepository(
         )
     }
 
+    suspend fun updateCaseFileMetadata(id: String, newName: String, newCategory: String, newDescription: String, newNotes: String) = withContext(Dispatchers.IO) {
+        evidenceDao.updateFileMetadata(id, newName, newCategory, newDescription, newNotes)
+        logAudit(
+            actionType = "EDIT",
+            module = "EVIDENCE",
+            entityId = id,
+            details = "تعديل بيانات وتصنيف الملف $newName (التصنيف: $newCategory)"
+        )
+        dispatchCloudSync("evidence", id)
+    }
+
     // ==========================================
     // CONTENT STUDIO CRUD & SYNC (FIXED CRITICAL DELETION)
     // ==========================================

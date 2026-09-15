@@ -41,14 +41,18 @@ import com.example.data.repository.ForensicRepository
 import com.example.ui.components.ForensicCrypto
 import com.example.ui.components.HudMessage
 import com.example.ui.components.HudType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 
 data class GlobalSearchResults(
@@ -177,6 +181,12 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     val externalRequestActiveTab = MutableStateFlow("الكل")
     val externalRequestsAutoSyncInterval = MutableStateFlow("إيقاف")
 
+    private val _sheetDiscoveryErrors = MutableStateFlow<Map<String, String>>(emptyMap())
+    val sheetDiscoveryErrors: StateFlow<Map<String, String>> = _sheetDiscoveryErrors.asStateFlow()
+
+    private val _isRefreshingSheets = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val isRefreshingSheets: StateFlow<Map<String, Boolean>> = _isRefreshingSheets.asStateFlow()
+
     // Admin System Management State
     val appSections = repository.allSectionConfigs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val visibleAppSections = repository.visibleSectionConfigs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -185,9 +195,24 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     val systemCategories = repository.allCategories.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val adminAuditLogs = repository.adminAuditLogs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val caseFileCategories: StateFlow<List<String>> = systemCategories.map { cats ->
+        val fileCats = cats.filter { it.scope == "CASE_FILES" }
+        if (fileCats.isEmpty()) {
+            listOf("صور", "مستندات", "مراسلات", "تقارير", "مرفقات العميل", "مرفقات المنصة", "فواتير", "أخرى")
+        } else {
+            fileCats.map { it.name }
+        }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        listOf("صور", "مستندات", "مراسلات", "تقارير", "مرفقات العميل", "مرفقات المنصة", "فواتير", "أخرى")
+    )
+
     val isAdminModeActive = MutableStateFlow(true)
     val topBarTitle = MutableStateFlow("منظومة جعفر بدران")
     val topBarSubtitle = MutableStateFlow("إدارة العمل والقضايا والطلبات")
+    val systemLogoPath = MutableStateFlow<String?>(null)
+    val favoriteSupportFormIds = MutableStateFlow<Set<String>>(emptySet())
 
     val profitSplitTeam = MutableStateFlow(20f)
     val profitSplitWork = MutableStateFlow(70f)
@@ -230,6 +255,14 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
             topBarTitle.value = savedTitle
             val savedSub = repository.getSettingValue("system_topbar_subtitle", "إدارة العمل والقضايا والطلبات")
             topBarSubtitle.value = savedSub
+            val savedLogo = repository.getSettingValue("system_logo_path", "")
+            if (savedLogo.isNotBlank() && File(savedLogo).exists()) {
+                systemLogoPath.value = savedLogo
+            }
+            val savedFavForms = repository.getSettingValue("favorite_support_forms", "")
+            if (savedFavForms.isNotBlank()) {
+                favoriteSupportFormIds.value = savedFavForms.split(",").filter { it.isNotBlank() }.toSet()
+            }
             val savedTeamSplit = repository.getSettingValue("profit_split_team", "20").toFloatOrNull() ?: 20f
             profitSplitTeam.value = savedTeamSplit
             val savedWorkSplit = repository.getSettingValue("profit_split_work", "70").toFloatOrNull() ?: 70f
@@ -240,6 +273,9 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
             if (_isLockEnabled.value) {
                 _isBiometricUnlocked.value = false
             }
+
+            // Ensure sample external requests table & sheets exist so users can immediately test
+            externalRequestsRepo.ensureDefaultSampleData(force = false)
         }
     }
 
@@ -1030,7 +1066,9 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
         mimeType: String,
         sha256: String,
         md5: String,
-        notes: String
+        notes: String = "",
+        category: String = "مستندات",
+        description: String = ""
     ) {
         viewModelScope.launch {
             val evidence = EvidenceEntity(
@@ -1051,10 +1089,25 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
                 localFilePath = localPath,
                 fileSizeBytes = fileSizeBytes,
                 fileSizeFormatted = fileSizeFormatted,
-                mimeType = mimeType
+                mimeType = mimeType,
+                category = category,
+                description = description
             )
             repository.insertOrUpdateEvidence(evidence, isNew = true)
-            showHud("تم إدراج وتوثيق الملف محلياً واستخراج البصمات", HudType.SUCCESS)
+            showHud("تم إرفاق وتوثيق الملف «$fileName» بنجاح", HudType.SUCCESS)
+        }
+    }
+
+    fun updateCaseFileMetadata(
+        id: String,
+        newName: String,
+        newCategory: String,
+        newDescription: String,
+        newNotes: String
+    ) {
+        viewModelScope.launch {
+            repository.updateCaseFileMetadata(id, newName, newCategory, newDescription, newNotes)
+            showHud("تم تحديث وحفظ بيانات وتصنيف الملف بنجاح", HudType.SUCCESS)
         }
     }
 
@@ -1483,6 +1536,41 @@ $sectionNumber التوصية الفنية والإجرائية:
         }
     }
 
+    fun addCsvSource(name: String, csvContent: String, onComplete: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val result = externalRequestsRepo.addCsvSource(name, csvContent)
+            if (result.isSuccess) {
+                val src = result.getOrThrow()
+                repository.logAudit(
+                    actionType = "CREATE",
+                    module = "EXTERNAL_REQUESTS",
+                    entityId = src.id,
+                    performedBy = _currentRole.value,
+                    details = "استيراد مصدر طلبات جديد من جدول CSV: ${src.name}"
+                )
+                showHud("تم استيراد مصدر الطلبات بنجاح والتعرف على الأعمدة", HudType.SUCCESS)
+                onComplete(true, "تم الاستيراد بنجاح")
+            } else {
+                val err = result.exceptionOrNull()?.localizedMessage ?: "فشل استيراد جدول CSV"
+                showHud(err, HudType.ERROR)
+                onComplete(false, err)
+            }
+        }
+    }
+
+    fun seedSampleParksData(onComplete: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                externalRequestsRepo.ensureDefaultSampleData(force = true)
+                showHud("تم تحميل جدول الحدائق والأوراق بنجاح", HudType.SUCCESS)
+                onComplete(true)
+            } catch (e: Exception) {
+                showHud("تعذر تحميل البيانات التجريبية", HudType.ERROR)
+                onComplete(false)
+            }
+        }
+    }
+
     fun updateExternalSource(source: ExternalRequestSourceEntity) {
         viewModelScope.launch {
             externalRequestsRepo.updateSource(source)
@@ -1513,13 +1601,19 @@ $sectionNumber التوصية الفنية والإجرائية:
 
     fun refreshSheetsForSource(sourceId: String) {
         viewModelScope.launch {
+            _isRefreshingSheets.value = _isRefreshingSheets.value + (sourceId to true)
+            _sheetDiscoveryErrors.value = _sheetDiscoveryErrors.value - sourceId
             showHud("جاري فحص وتحديث أوراق العمل من Google Sheets...", HudType.INFO)
             val result = externalRequestsRepo.refreshSheetsForSource(sourceId)
+            _isRefreshingSheets.value = _isRefreshingSheets.value + (sourceId to false)
             if (result.isSuccess) {
                 val sheets = result.getOrThrow()
+                _sheetDiscoveryErrors.value = _sheetDiscoveryErrors.value - sourceId
                 showHud("تم تحديث الأوراق بنجاح (${sheets.size} ورقة)", HudType.SUCCESS)
             } else {
-                showHud("تعذر تحديث الأوراق: ${result.exceptionOrNull()?.localizedMessage}", HudType.ERROR)
+                val errorMsg = result.exceptionOrNull()?.localizedMessage ?: "تعذر قراءة أوراق العمل"
+                _sheetDiscoveryErrors.value = _sheetDiscoveryErrors.value + (sourceId to errorMsg)
+                showHud(errorMsg, HudType.ERROR)
             }
         }
     }
@@ -1780,6 +1874,62 @@ $sectionNumber التوصية الفنية والإجرائية:
             repository.saveSettingValue("system_topbar_title", topBarTitle.value)
             repository.saveSettingValue("system_topbar_subtitle", topBarSubtitle.value)
             showHud("تم تحديث ترويسة المنظومة بنجاح", HudType.SUCCESS)
+        }
+    }
+
+    // Official System Logo Management (Permanent Offline Storage)
+    fun saveSystemLogo(context: Context, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val logoFile = File(context.filesDir, "system_logo.png")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(logoFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                repository.saveSettingValue("system_logo_path", logoFile.absolutePath)
+                systemLogoPath.value = logoFile.absolutePath
+                showHud("تم حفظ وتثبيت الشعار بنجاح وسيتم تطبيقه على التقارير تلقائياً", HudType.SUCCESS)
+            } catch (e: Exception) {
+                showHud("تعذر حفظ الشعار: ${e.localizedMessage}", HudType.ERROR)
+            }
+        }
+    }
+
+    fun deleteSystemLogo(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val logoFile = File(context.filesDir, "system_logo.png")
+                if (logoFile.exists()) {
+                    logoFile.delete()
+                }
+                val currentPath = systemLogoPath.value
+                if (currentPath != null) {
+                    val f = File(currentPath)
+                    if (f.exists()) f.delete()
+                }
+                repository.saveSettingValue("system_logo_path", "")
+                systemLogoPath.value = null
+                showHud("تم حذف الشعار واستعادة الشعار النصي الافتراضي", HudType.INFO)
+            } catch (e: Exception) {
+                showHud("تعذر حذف الشعار: ${e.localizedMessage}", HudType.ERROR)
+            }
+        }
+    }
+
+    // Support Form Favorite Toggle
+    fun toggleFavoriteSupportForm(formId: String) {
+        viewModelScope.launch {
+            val current = favoriteSupportFormIds.value.toMutableSet()
+            val wasFav = current.contains(formId)
+            if (wasFav) {
+                current.remove(formId)
+            } else {
+                current.add(formId)
+            }
+            favoriteSupportFormIds.value = current
+            repository.saveSettingValue("favorite_support_forms", current.joinToString(","))
+            showHud(if (wasFav) "تمت إزالة النموذج من المفضلة" else "تمت إضافة النموذج إلى المفضلة", HudType.INFO)
         }
     }
 

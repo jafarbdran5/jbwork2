@@ -29,15 +29,19 @@ data class ExternalRequestSourceEntity(
 data class ExternalSheetEntity(
     @PrimaryKey val id: String, // e.g. ${sourceId}_${sheetId}
     val sourceId: String,
-    val sheetId: String, // gid or sheet name identifier
+    val spreadsheetId: String = "",
+    val sheetId: String, // real sheetId (gid or unique identifier)
     val sheetName: String, // e.g. "الطلبات الجديدة", "أرشيف"
+    val index: Int = 0,
     val enabled: Boolean = true,
     val ignored: Boolean = false,
     val rowCount: Int = 0,
     val columnCount: Int = 0,
     val lastSync: Long? = null,
     val customDisplayName: String? = null,
-    val columnMappingJson: String = "{}"
+    val columnMappingJson: String = "{}",
+    val sheetType: String = "GRID",
+    val hidden: Boolean = false
 )
 
 /**

@@ -84,6 +84,9 @@ interface EvidenceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(evidence: EvidenceEntity)
 
+    @Query("UPDATE evidence SET evidenceName = :newName, category = :newCategory, description = :newDescription, notes = :newNotes, syncStatus = 'PENDING_SYNC' WHERE id = :id")
+    suspend fun updateFileMetadata(id: String, newName: String, newCategory: String, newDescription: String, newNotes: String)
+
     @Query("UPDATE evidence SET isDeleted = 1, deletedAt = :deletedAt, syncStatus = 'PENDING_SYNC' WHERE id = :id")
     suspend fun softDelete(id: String, deletedAt: Long = System.currentTimeMillis())
 

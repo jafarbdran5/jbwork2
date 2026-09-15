@@ -59,8 +59,10 @@ class ExternalRequestsRepository(
             val sheetEntity = ExternalSheetEntity(
                 id = "${sourceId}_0",
                 sourceId = sourceId,
+                spreadsheetId = source.spreadsheetId,
                 sheetId = "0",
                 sheetName = "ورقة البيانات المستوردة",
+                index = 0,
                 enabled = true,
                 ignored = false,
                 rowCount = 0,
@@ -153,12 +155,16 @@ class ExternalRequestsRepository(
                 ExternalSheetEntity(
                     id = "${sourceId}_${s.sheetId.ifBlank { idx.toString() }}",
                     sourceId = sourceId,
+                    spreadsheetId = spreadsheetId,
                     sheetId = s.sheetId.ifBlank { idx.toString() },
                     sheetName = s.sheetName,
+                    index = s.index,
                     enabled = true, // First batch is enabled
                     ignored = false,
-                    rowCount = 0,
-                    columnCount = 0,
+                    sheetType = s.sheetType,
+                    hidden = s.hidden,
+                    rowCount = s.rowCount,
+                    columnCount = s.columnCount,
                     lastSync = null
                 )
             }
@@ -243,8 +249,10 @@ class ExternalRequestsRepository(
             val newSheet = ExternalSheetEntity(
                 id = id,
                 sourceId = sourceId,
+                spreadsheetId = source.spreadsheetId,
                 sheetId = cleanGid,
                 sheetName = cleanName,
+                index = 999,
                 enabled = true,
                 ignored = false,
                 rowCount = 0,
@@ -300,31 +308,54 @@ class ExternalRequestsRepository(
             val discovered = sheetsService.discoverSheets(source.publicUrl).getOrThrow()
             val newEntities = mutableListOf<ExternalSheetEntity>()
 
-            for ((idx, ds) in discovered.withIndex()) {
+            for (ds in discovered) {
                 val cleanName = ds.sheetName.trim()
-                val gid = ds.sheetId.ifBlank { "$idx" }
+                val gid = ds.sheetId.ifBlank { "${ds.index}" }
                 val matchById = existingById[gid]
                 val matchByName = existingByNames[cleanName]
 
                 if (matchById != null) {
-                    // Update sheet name if changed on Google Sheets
-                    if (matchById.sheetName != cleanName) {
-                        sheetDao.updateSheetName(matchById.id, cleanName)
-                    }
+                    // Update sheet metadata if changed on Google Sheets
+                    val rowCount = if (ds.rowCount > 0) ds.rowCount else matchById.rowCount
+                    val colCount = if (ds.columnCount > 0) ds.columnCount else matchById.columnCount
+                    sheetDao.updateSheetFullMetadata(
+                        id = matchById.id,
+                        name = cleanName,
+                        index = ds.index,
+                        rowCount = rowCount,
+                        colCount = colCount,
+                        sheetType = ds.sheetType,
+                        hidden = ds.hidden
+                    )
                 } else if (matchByName != null) {
-                    // Already exists by name
+                    // Already exists by name, update metadata
+                    val rowCount = if (ds.rowCount > 0) ds.rowCount else matchByName.rowCount
+                    val colCount = if (ds.columnCount > 0) ds.columnCount else matchByName.columnCount
+                    sheetDao.updateSheetFullMetadata(
+                        id = matchByName.id,
+                        name = cleanName,
+                        index = ds.index,
+                        rowCount = rowCount,
+                        colCount = colCount,
+                        sheetType = ds.sheetType,
+                        hidden = ds.hidden
+                    )
                 } else {
                     // Newly discovered sheet: enabled = true by default
                     newEntities.add(
                         ExternalSheetEntity(
                             id = "${sourceId}_$gid",
                             sourceId = sourceId,
+                            spreadsheetId = source.spreadsheetId,
                             sheetId = gid,
                             sheetName = cleanName,
+                            index = ds.index,
                             enabled = true,
                             ignored = false,
-                            rowCount = 0,
-                            columnCount = 0,
+                            sheetType = ds.sheetType,
+                            hidden = ds.hidden,
+                            rowCount = ds.rowCount,
+                            columnCount = ds.columnCount,
                             lastSync = null,
                             customDisplayName = null,
                             columnMappingJson = "{}"
@@ -540,5 +571,20 @@ class ExternalRequestsRepository(
 
     suspend fun updateRequestNotes(requestId: String, notes: String) = withContext(Dispatchers.IO) {
         requestDao.updateInternalNotes(requestId, notes)
+    }
+
+    suspend fun ensureDefaultSampleData(force: Boolean = false) = withContext(Dispatchers.IO) {
+        try {
+            val sourceId = "src_sample_national_parks"
+            val existing = sourceDao.getSourceById(sourceId)
+            if (existing != null) {
+                requestDao.deleteBySourceId(sourceId)
+                sheetDao.deleteBySourceId(sourceId)
+                sourceDao.deleteSource(sourceId)
+                Log.d("ExternalRequestsRepo", "Purged dummy sample national parks source.")
+            }
+        } catch (e: Exception) {
+            Log.w("ExternalRequestsRepo", "Dummy cleanup encountered: ${e.message}")
+        }
     }
 }

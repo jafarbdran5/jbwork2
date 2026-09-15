@@ -4,6 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,9 +28,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FileDownload
@@ -40,12 +45,16 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -75,6 +84,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -82,16 +93,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entities.CaseEntity
 import com.example.data.local.entities.CasePaymentEntity
 import com.example.data.local.entities.EvidenceEntity
 import com.example.reports.ExportResult
 import com.example.reports.FullForensicReport
+import com.example.reports.LogoPosition
+import com.example.reports.LogoSize
 import com.example.reports.ReportEvidenceItem
 import com.example.reports.ReportExportFormat
 import com.example.reports.ReportExporter
 import com.example.reports.ReportPaymentSummary
+import com.example.reports.ReportSection
 import com.example.reports.ReportSourceItem
 import com.example.reports.TimelineEventItem
 import com.example.ui.components.CyberBadge
@@ -167,6 +183,7 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
     val cases by viewModel.rawCases.collectAsState()
     val evidenceList by viewModel.rawEvidence.collectAsState()
     val rawPayments by viewModel.rawPayments.collectAsState()
+    val systemLogoPath by viewModel.systemLogoPath.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -180,6 +197,32 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
     val caseEvidence = selectedCase?.let { c -> evidenceList.filter { it.caseId == c.id } } ?: emptyList()
     val casePayments = selectedCase?.let { c -> rawPayments.filter { it.caseId == c.id } } ?: emptyList()
 
+    // Report Customization States
+    var customTitle by remember(selectedReportType) { mutableStateOf(selectedReportType) }
+    var customIntro by remember(selectedCase) {
+        mutableStateOf(
+            selectedCase?.description?.ifBlank { selectedCase.notes }?.ifBlank {
+                "تم فحص القضية ومراجعة كافة البيانات الفنية والأدلة الجنائية المرتبطة بها، وتأكيد خلوها من التلاعب وتوثيق البصمات التشفيرية المعتمدة."
+            } ?: "ملخص فني معتمد لمتابعة إجراءات الفحص والتحقيق واستخلاص الأدلة."
+        )
+    }
+    var customContent by remember(selectedCase) {
+        mutableStateOf(
+            selectedCase?.notes?.ifBlank {
+                "تمت مطابقة التوقيعات الرقمية وتحليل السجلات واستخلاص البيانات الداعمة للتقرير وفق المعايير والضوابط الجنائية المعتمدة."
+            } ?: "فحص وتحليل فني معتمد للبصمات الرقمية وسلسلة الحيازة."
+        )
+    }
+    var customNotesText by remember { mutableStateOf("") }
+    var customConclusion by remember { mutableStateOf("تم فحص واعتماد هذا التقرير الجنائي وفق الضوابط والمعايير الرقمية المعتمدة.") }
+    var logoPosition by remember { mutableStateOf(LogoPosition.RIGHT) }
+    var logoSize by remember { mutableStateOf(LogoSize.MEDIUM) }
+    var showLogo by remember { mutableStateOf(true) }
+    var visibleSections by remember { mutableStateOf(ReportSection.entries.toList()) }
+
+    var showCustomizeDialog by remember { mutableStateOf(false) }
+    var showPreviewDialog by remember { mutableStateOf(false) }
+
     val reportTypes = listOf(
         "تقرير متابعة القضية المعتمد",
         "سجل المرفقات والتحقق الرقمي",
@@ -191,7 +234,10 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
         generateReportText(selectedReportType, selectedCase, caseEvidence, cases)
     }
 
-    val fullForensicReport = remember(selectedCase, caseEvidence, casePayments, selectedReportType) {
+    val fullForensicReport = remember(
+        selectedCase, caseEvidence, casePayments, customTitle, customIntro, customContent,
+        customNotesText, customConclusion, systemLogoPath, showLogo, logoPosition, logoSize, visibleSections
+    ) {
         val genDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
         val paidTotal = casePayments.sumOf { it.amount }
         val remaining = ((selectedCase?.totalAmount ?: 0.0) - paidTotal).coerceAtLeast(0.0)
@@ -210,7 +256,7 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
 
         FullForensicReport(
             reportId = "REP-${selectedCase?.caseNumber ?: "GEN"}-${System.currentTimeMillis().toString().takeLast(4)}",
-            title = selectedReportType,
+            title = customTitle,
             caseNumber = selectedCase?.caseNumber ?: "JB-2026-0001",
             generatedDate = genDate,
             clientName = selectedCase?.clientName ?: "العميل المستهدف",
@@ -220,9 +266,7 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
             threatType = selectedCase?.threatType ?: "استشارة أمنية وفحص رقمي",
             status = selectedCase?.status ?: "قيد المتابعة",
             dueDate = selectedCase?.dueDate ?: "غير محدد",
-            executiveSummary = selectedCase?.description?.ifBlank { selectedCase.notes }?.ifBlank {
-                "تم فحص القضية ومراجعة كافة البيانات الفنية والأدلة الجنائية المرتبطة بها، وتأكيد خلوها من التلاعب وتوثيق البصمات التشفيرية المعتمدة."
-            } ?: "ملخص فني معتمد لمتابعة إجراءات الفحص والتحقيق واستخلاص الأدلة.",
+            executiveSummary = customIntro,
             timelineEvents = emptyList<TimelineEventItem>(),
             evidenceList = caseEvidence.map { ev ->
                 ReportEvidenceItem(
@@ -235,17 +279,24 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
                     chainOfCustody = ev.chainOfCustodyLog
                 )
             },
-            technicalAnalysis = selectedCase?.notes?.ifBlank {
-                "تمت مطابقة التوقيعات الرقمية وتحليل السجلات واستخلاص البيانات الداعمة للتقرير وفق المعايير والضوابط الجنائية المعتمدة."
-            } ?: "فحص وتحليل فني معتمد للبصمات الرقمية وسلسلة الحيازة.",
+            technicalAnalysis = customContent,
             officialSourcesUsed = emptyList<ReportSourceItem>(),
-            finalOutcome = "اكتملت إجراءات الفحص والتوثيق واستخراج التقرير الفني المعتمد بنجاح.",
-            securityRecommendations = listOf(
-                "تفعيل التحقق بخطوتين عبر تطبيقات المصادقة المتوافقة على جميع الحسابات.",
-                "مراجعة سجلات الوصول والأجهزة المتصلة وتحديث كلمات المرور دورياً.",
-                "حفظ البصمات الرقمية للأدلة في مستودع آمن معزول لضمان عدم العبث أو التلف."
-            ),
-            paymentsSummary = paymentSummary
+            finalOutcome = customConclusion,
+            securityRecommendations = if (customNotesText.isNotBlank()) {
+                customNotesText.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+            } else {
+                listOf(
+                    "تفعيل التحقق بخطوتين عبر تطبيقات المصادقة المتوافقة على جميع الحسابات.",
+                    "مراجعة سجلات الوصول والأجهزة المتصلة وتحديث كلمات المرور دورياً.",
+                    "حفظ البصمات الرقمية للأدلة في مستودع آمن معزول لضمان عدم العبث أو التلف."
+                )
+            },
+            paymentsSummary = paymentSummary,
+            logoPath = systemLogoPath,
+            showLogo = showLogo,
+            logoPosition = logoPosition,
+            logoSize = logoSize,
+            visibleSections = visibleSections
         )
     }
 
@@ -468,7 +519,36 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showCustomizeDialog = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberPrimaryLight)
+                        ) {
+                            Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("تخصيص التقرير", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { showPreviewDialog = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberSuccess)
+                        ) {
+                            Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("معاينة التقرير", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Button(
                         onClick = {
@@ -690,6 +770,52 @@ private fun CertifiedReportsView(viewModel: ForensicViewModel) {
                 }
             }
         }
+    }
+
+    if (showCustomizeDialog) {
+        ReportCustomizeDialog(
+            report = fullForensicReport,
+            customTitle = customTitle,
+            onTitleChange = { customTitle = it },
+            customIntro = customIntro,
+            onIntroChange = { customIntro = it },
+            customContent = customContent,
+            onContentChange = { customContent = it },
+            customNotes = customNotesText,
+            onNotesChange = { customNotesText = it },
+            customConclusion = customConclusion,
+            onConclusionChange = { customConclusion = it },
+            showLogo = showLogo,
+            onShowLogoChange = { showLogo = it },
+            logoPosition = logoPosition,
+            onLogoPositionChange = { logoPosition = it },
+            logoSize = logoSize,
+            onLogoSizeChange = { logoSize = it },
+            visibleSections = visibleSections,
+            onVisibleSectionsChange = { visibleSections = it },
+            onDismiss = { showCustomizeDialog = false }
+        )
+    }
+
+    if (showPreviewDialog) {
+        ReportPreviewDialog(
+            report = fullForensicReport,
+            onDismiss = { showPreviewDialog = false },
+            onExport = {
+                showPreviewDialog = false
+                scope.launch {
+                    isExporting = true
+                    val result = ReportExporter.generateAndSaveReport(context, fullForensicReport, selectedFormat)
+                    isExporting = false
+                    result.onSuccess { res ->
+                        lastExportResult = res
+                        viewModel.showHud("تم توليد ملف ${res.format.name} بنجاح وحفظه في ذاكرة التخزين", HudType.SUCCESS)
+                    }.onFailure { err ->
+                        viewModel.showHud("فشل توليد التقرير: ${err.localizedMessage}", HudType.ERROR)
+                    }
+                }
+            }
+        )
     }
 }
 
@@ -1338,5 +1464,661 @@ ${
         المصادقة والاعتماد: جعفر بدران
 ======================================================
         """.trimIndent()
+    }
+}
+
+// =========================================================================
+// CUSTOMIZE REPORT DIALOG: تخصيص كافة بيانات وتفاصيل وشعار التقرير
+// =========================================================================
+@Composable
+private fun ReportCustomizeDialog(
+    report: FullForensicReport,
+    customTitle: String,
+    onTitleChange: (String) -> Unit,
+    customIntro: String,
+    onIntroChange: (String) -> Unit,
+    customContent: String,
+    onContentChange: (String) -> Unit,
+    customNotes: String,
+    onNotesChange: (String) -> Unit,
+    customConclusion: String,
+    onConclusionChange: (String) -> Unit,
+    showLogo: Boolean,
+    onShowLogoChange: (Boolean) -> Unit,
+    logoPosition: LogoPosition,
+    onLogoPositionChange: (LogoPosition) -> Unit,
+    logoSize: LogoSize,
+    onLogoSizeChange: (LogoSize) -> Unit,
+    visibleSections: List<ReportSection>,
+    onVisibleSectionsChange: (List<ReportSection>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .padding(vertical = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Tune, contentDescription = null, tint = CyberPrimaryLight, modifier = Modifier.size(22.dp))
+                        Column {
+                            Text(
+                                text = "تخصيص بنية وتفاصيل التقرير",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "التحكم في النصوص والشعار وترتيب الأقسام قبل التصدير",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // Section 1: النصوص والعناوين
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    text = "1. العناوين والنصوص الرسمية",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = CyberPrimaryLight
+                                )
+
+                                OutlinedTextField(
+                                    value = customTitle,
+                                    onValueChange = onTitleChange,
+                                    label = { Text("عنوان التقرير") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                OutlinedTextField(
+                                    value = customIntro,
+                                    onValueChange = onIntroChange,
+                                    label = { Text("المقدمة والملخص التنفيذي") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    minLines = 3,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                OutlinedTextField(
+                                    value = customContent,
+                                    onValueChange = onContentChange,
+                                    label = { Text("المحتوى والتحليل الفني") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    minLines = 3,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                OutlinedTextField(
+                                    value = customNotes,
+                                    onValueChange = onNotesChange,
+                                    label = { Text("الملاحظات والتوصيات (سطر لكل نقطة)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    minLines = 2,
+                                    placeholder = { Text("مثال:\nتحديث كلمات المرور\nتفعيل التحقق بخطوتين") },
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                OutlinedTextField(
+                                    value = customConclusion,
+                                    onValueChange = onConclusionChange,
+                                    label = { Text("الخاتمة والتوصيف النهائي") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    minLines = 2,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Section 2: إعدادات الشعار
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "2. موضع وحجم الشعار الرسمي",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = CyberPrimaryLight
+                                    )
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = "تضمين الشعار", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        Checkbox(
+                                            checked = showLogo,
+                                            onCheckedChange = onShowLogoChange,
+                                            colors = CheckboxDefaults.colors(checkedColor = CyberPrimary)
+                                        )
+                                    }
+                                }
+
+                                if (showLogo) {
+                                    // Location selector
+                                    Text(text = "مكان الشعار في رأس الصفحة:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        listOf(
+                                            LogoPosition.RIGHT to "اليمين",
+                                            LogoPosition.CENTER to "الوسط",
+                                            LogoPosition.LEFT to "اليسار"
+                                        ).forEach { (pos, label) ->
+                                            val isSelected = logoPosition == pos
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (isSelected) CyberPrimary else MaterialTheme.colorScheme.surface)
+                                                    .border(1.dp, if (isSelected) CyberPrimaryLight else CyberBorder, RoundedCornerShape(8.dp))
+                                                    .clickable { onLogoPositionChange(pos) }
+                                                    .padding(vertical = 8.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Size selector
+                                    Text(text = "حجم الشعار:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        listOf(
+                                            LogoSize.SMALL to "صغير",
+                                            LogoSize.MEDIUM to "متوسط",
+                                            LogoSize.LARGE to "كبير"
+                                        ).forEach { (sz, label) ->
+                                            val isSelected = logoSize == sz
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (isSelected) CyberPrimary else MaterialTheme.colorScheme.surface)
+                                                    .border(1.dp, if (isSelected) CyberPrimaryLight else CyberBorder, RoundedCornerShape(8.dp))
+                                                    .clickable { onLogoSizeChange(sz) }
+                                                    .padding(vertical = 8.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Section 3: ترتيب وظهور الأقسام
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "3. ترتيب وظهور أقسام التقرير",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = CyberPrimaryLight
+                                )
+                                Text(
+                                    text = "حدد الأقسام التي تود طباعتها واستخدم الأسهم لإعادة الترتيب:",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                visibleSections.forEachIndexed { index, section ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surface)
+                                            .border(1.dp, CyberBorder, RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Text(
+                                                text = "${index + 1}.",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = CyberPrimaryLight
+                                            )
+                                            Text(
+                                                text = section.titleAr,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            // Move up
+                                            IconButton(
+                                                onClick = {
+                                                    if (index > 0) {
+                                                        val newList = visibleSections.toMutableList()
+                                                        val item = newList.removeAt(index)
+                                                        newList.add(index - 1, item)
+                                                        onVisibleSectionsChange(newList)
+                                                    }
+                                                },
+                                                enabled = index > 0,
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.ArrowUpward,
+                                                    contentDescription = "تحريك للأعلى",
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = if (index > 0) CyberPrimaryLight else Color.Gray.copy(alpha = 0.4f)
+                                                )
+                                            }
+
+                                            // Move down
+                                            IconButton(
+                                                onClick = {
+                                                    if (index < visibleSections.size - 1) {
+                                                        val newList = visibleSections.toMutableList()
+                                                        val item = newList.removeAt(index)
+                                                        newList.add(index + 1, item)
+                                                        onVisibleSectionsChange(newList)
+                                                    }
+                                                },
+                                                enabled = index < visibleSections.size - 1,
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.ArrowDownward,
+                                                    contentDescription = "تحريك للأسفل",
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = if (index < visibleSections.size - 1) CyberPrimaryLight else Color.Gray.copy(alpha = 0.4f)
+                                                )
+                                            }
+
+                                            // Remove section
+                                            IconButton(
+                                                onClick = {
+                                                    val newList = visibleSections.toMutableList()
+                                                    newList.removeAt(index)
+                                                    onVisibleSectionsChange(newList)
+                                                },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "إخفاء القسم",
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = CyberDanger
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // If some sections are hidden, allow re-adding them
+                                val hiddenSections = ReportSection.entries.filter { !visibleSections.contains(it) }
+                                if (hiddenSections.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "أقسام مخفية (اضغط لإعادة الإضافة):",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        hiddenSections.forEach { hidden ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(MaterialTheme.colorScheme.surface)
+                                                    .border(1.dp, CyberBorder, RoundedCornerShape(6.dp))
+                                                    .clickable {
+                                                        onVisibleSectionsChange(visibleSections + hidden)
+                                                    }
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(12.dp), tint = CyberSuccess)
+                                                    Text(text = hidden.titleAr, fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurface)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "حفظ واعتماد التخصيص", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =========================================================================
+// PREVIEW REPORT DIALOG: معاينة مباشرة وتفاعلية قبل التصدير
+// =========================================================================
+@Composable
+private fun ReportPreviewDialog(
+    report: FullForensicReport,
+    onDismiss: () -> Unit,
+    onExport: () -> Unit
+) {
+    val logoBitmap = remember(report.logoPath) {
+        if (report.logoPath != null) {
+            try {
+                BitmapFactory.decodeFile(report.logoPath)
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .padding(vertical = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Top Action Bar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Visibility, contentDescription = null, tint = CyberSuccess, modifier = Modifier.size(22.dp))
+                        Column {
+                            Text(
+                                text = "معاينة التقرير الجنائي المعتمد",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "محاكاة طبق الأصل للشكل النهائي للمستند الرسمي",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Simulated Document Page
+                Card(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+                ) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Header Banner
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF0F172A))
+                                    .padding(14.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    // Logo Rendering
+                                    if (report.showLogo) {
+                                        val logoAlignment = when (report.logoPosition) {
+                                            LogoPosition.RIGHT -> Alignment.End
+                                            LogoPosition.CENTER -> Alignment.CenterHorizontally
+                                            LogoPosition.LEFT -> Alignment.Start
+                                        }
+                                        val logoHeight = when (report.logoSize) {
+                                            LogoSize.SMALL -> 36.dp
+                                            LogoSize.MEDIUM -> 50.dp
+                                            LogoSize.LARGE -> 68.dp
+                                        }
+
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalAlignment = logoAlignment
+                                        ) {
+                                            if (logoBitmap != null) {
+                                                Image(
+                                                    bitmap = logoBitmap.asImageBitmap(),
+                                                    contentDescription = "شعار التقرير",
+                                                    modifier = Modifier.height(logoHeight),
+                                                    contentScale = ContentScale.Fit
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = "JAFFAR BADRAN DIGITAL FORENSICS",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = Color(0xFFD97706)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Text(
+                                        text = report.title,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "رقم القضية: ${report.caseNumber}", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                        Text(text = "التاريخ: ${report.generatedDate}", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.dp)
+                                            .background(Color(0xFFD97706))
+                                    )
+                                }
+                            }
+                        }
+
+                        // Render Visible Sections
+                        items(report.visibleSections) { section ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(1.dp, CyberBorder, RoundedCornerShape(8.dp))
+                                    .padding(10.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = section.titleAr,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CyberPrimaryLight
+                                    )
+
+                                    when (section) {
+                                        ReportSection.EXECUTIVE_SUMMARY -> {
+                                            Text(text = report.executiveSummary, fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurface, lineHeight = 16.sp)
+                                        }
+                                        ReportSection.CASE_DETAILS -> {
+                                            Text(text = "العميل: ${report.clientName} | التصنيف: ${report.threatType} | الأولوية: ${report.priority} | الحالة: ${report.status}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                        ReportSection.FINANCIAL_SUMMARY -> {
+                                            report.paymentsSummary?.let { p ->
+                                                Text(text = "إجمالي المبلغ: ${p.totalAmount} SAR | المسدد: ${p.paidAmount} SAR | المتبقي: ${p.remainingAmount} SAR (${p.paymentStatus})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                                            } ?: Text(text = "لا توجد مستحقات مالية مسجلة على هذه القضية.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        ReportSection.EVIDENCE_LEDGER -> {
+                                            Text(text = "عدد الأدلة والمرفقات الموثقة: ${report.evidenceList.size} ملفات مؤمنة ببصمات SHA-256 وسلسلة حيازة غير قابلة للتلاعب.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                        ReportSection.TECHNICAL_ANALYSIS -> {
+                                            Text(text = report.technicalAnalysis, fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurface, lineHeight = 16.sp)
+                                        }
+                                        ReportSection.CUSTOM_NOTES -> {
+                                            Text(text = "تم توثيق كافة الملاحظات الفنية والإرشادات المرتبطة بملف الفحص بدقة.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                        ReportSection.RECOMMENDATIONS -> {
+                                            report.securityRecommendations.forEach { rec ->
+                                                Text(text = "• $rec", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                                            }
+                                        }
+                                        ReportSection.SIGNATURE -> {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text(text = "المحقق الجنائي الرقمي: جعفر بدران", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                                    Text(text = "التوثيق والاعتماد: VERIFIED & OFFICIALLY SEALED", fontSize = 9.5.sp, color = CyberSuccess)
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .border(1.dp, Color(0xFFD97706), RoundedCornerShape(4.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                ) {
+                                                    Text(text = "ختم الاعتماد الرسمي", fontSize = 10.sp, color = Color(0xFFD97706), fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Bottom Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(text = "إغلاق المعاينة", fontSize = 12.sp)
+                    }
+
+                    Button(
+                        onClick = onExport,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "تصدير الآن", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }

@@ -106,7 +106,7 @@ import kotlinx.coroutines.launch
         GeneratedReportEntity::class,
         ReportTemplateEntity::class
     ],
-    version = 10,
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -313,6 +313,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `evidence` ADD COLUMN `category` TEXT NOT NULL DEFAULT 'مستندات'")
+                db.execSQL("ALTER TABLE `evidence` ADD COLUMN `description` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE `external_sheets` ADD COLUMN `sheetType` TEXT NOT NULL DEFAULT 'GRID'")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE `external_sheets` ADD COLUMN `hidden` INTEGER NOT NULL DEFAULT 0")
+                } catch (_: Exception) {}
+            }
+        }
+
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -320,7 +338,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "jaffar_forensics.db"
                 )
-                .addMigrations(MIGRATION_4_5, MIGRATION_6_7, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(MIGRATION_4_5, MIGRATION_6_7, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_12_13)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
@@ -741,7 +759,16 @@ abstract class AppDatabase : RoomDatabase() {
                 SystemCategoryEntity("cat_exp_01", "EXPENSES", "أدوات وبرامج تقنية", "#0288D1", 0),
                 SystemCategoryEntity("cat_exp_02", "EXPENSES", "سيرفرات واستضافة وسحابة", "#7B1FA2", 1),
                 SystemCategoryEntity("cat_exp_03", "EXPENSES", "مصاريف إدارية ومكتبية", "#689F38", 2),
-                SystemCategoryEntity("cat_exp_04", "EXPENSES", "استشارات وفريق عمل", "#F57C00", 3)
+                SystemCategoryEntity("cat_exp_04", "EXPENSES", "استشارات وفريق عمل", "#F57C00", 3),
+                // Case Files Categories (ملفات القضية)
+                SystemCategoryEntity("cat_file_01", "CASE_FILES", "صور", "#00E5FF", 0),
+                SystemCategoryEntity("cat_file_02", "CASE_FILES", "مستندات", "#2979FF", 1),
+                SystemCategoryEntity("cat_file_03", "CASE_FILES", "مراسلات", "#7C4DFF", 2),
+                SystemCategoryEntity("cat_file_04", "CASE_FILES", "تقارير", "#00B0FF", 3),
+                SystemCategoryEntity("cat_file_05", "CASE_FILES", "مرفقات العميل", "#00E676", 4),
+                SystemCategoryEntity("cat_file_06", "CASE_FILES", "مرفقات المنصة", "#FF9100", 5),
+                SystemCategoryEntity("cat_file_07", "CASE_FILES", "فواتير", "#FFD600", 6),
+                SystemCategoryEntity("cat_file_08", "CASE_FILES", "أخرى", "#78909C", 7)
             )
             db.systemCategoryDao().insertAll(defaultCategories)
 

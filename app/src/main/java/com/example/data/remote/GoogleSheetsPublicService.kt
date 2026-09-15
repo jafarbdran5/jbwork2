@@ -7,13 +7,24 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.net.URLEncoder
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
+import java.util.zip.ZipInputStream
 
 data class DiscoveredSheet(
     val sheetId: String,
-    val sheetName: String
+    val sheetName: String,
+    val index: Int = 0,
+    val sheetType: String = "GRID",
+    val hidden: Boolean = false,
+    val rowCount: Int = 0,
+    val columnCount: Int = 0
 )
 
 data class SpreadsheetDiagnosticReport(
@@ -202,160 +213,356 @@ class GoogleSheetsPublicService {
     }
 
     /**
-     * Automatically discovers all sheet tabs inside the public Google Sheet.
+     * Automatically discovers all sheet tabs inside the public Google Sheet metadata.
+     * Extracts all sheets without requiring Google login, manual GID, or fixed sheet names.
+     * Uses streaming XLSX workbook metadata analysis, correlated with HTML/JSON bootstrap extraction.
      */
     suspend fun discoverSheets(publicUrl: String): Result<List<DiscoveredSheet>> = withContext(Dispatchers.IO) {
         try {
             val spreadsheetId = extractSpreadsheetId(publicUrl)
-            val sheets = mutableListOf<DiscoveredSheet>()
-            val seenNames = mutableSetOf<String>()
-            val seenGids = mutableSetOf<String>()
+            if (spreadsheetId.isBlank()) {
+                return@withContext Result.failure(IllegalArgumentException("الرابط غير متاح - رابط Google Sheet غير صالح"))
+            }
 
-            fun addSheet(gid: String, name: String) {
-                val cleanGid = gid.trim().ifBlank { "0" }
-                val cleanName = android.text.Html.fromHtml(name.trim(), android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
-                if (cleanName.isNotBlank() && !seenNames.contains(cleanName)) {
-                    seenNames.add(cleanName)
-                    seenGids.add(cleanGid)
-                    sheets.add(DiscoveredSheet(sheetId = cleanGid, sheetName = cleanName))
+            val discoveredList = mutableListOf<DiscoveredSheet>()
+            val nameToGidMap = mutableMapOf<String, String>()
+            val htmlDiscoveredSheets = mutableListOf<DiscoveredSheet>()
+            var connectionError: Exception? = null
+
+            // Helper to clean HTML/XML encoded text
+            fun cleanSheetName(raw: String): String {
+                val decoded = android.text.Html.fromHtml(raw.trim(), android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
+                return decoded.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'")
+            }
+
+            // Step 1: Query htmlview / pubhtml / edit pages to extract all sheet GIDs and tab names
+            val urlsToQuery = mutableListOf<String>()
+            if (publicUrl.contains("/d/e/")) {
+                urlsToQuery.add("https://docs.google.com/spreadsheets/d/e/$spreadsheetId/pubhtml")
+                urlsToQuery.add("https://docs.google.com/spreadsheets/d/e/$spreadsheetId/htmlview")
+            } else {
+                urlsToQuery.add("https://docs.google.com/spreadsheets/d/$spreadsheetId/htmlview")
+                urlsToQuery.add("https://docs.google.com/spreadsheets/d/$spreadsheetId/edit?usp=sharing")
+            }
+
+            for (pageUrl in urlsToQuery) {
+                try {
+                    val req = Request.Builder()
+                        .url(pageUrl)
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                        .build()
+                    val resp = client.newCall(req).execute()
+                    val html = resp.body?.string() ?: ""
+
+                    // Check access restrictions in HTML
+                    if (resp.code == 404) {
+                        return@withContext Result.failure(Exception("الرابط غير متاح - ملف Google Sheet غير موجود (404)"))
+                    }
+                    if (resp.code == 401 || resp.code == 403 || html.contains("accounts.google.com/ServiceLogin") || html.contains("Sign in - Google Accounts")) {
+                        return@withContext Result.failure(Exception("المصدر غير عام - يرجى ضبط مشاركة الملف على «أي شخص لديه الرابط يمكنه العرض»"))
+                    }
+
+                    // Pattern 0: items.push({name: "SheetName", ... gid: "0"}) standard in htmlview
+                    val itemsPushPattern = Pattern.compile("name:\\s*[\"']([^\"']+)[\"'][^}]*gid:\\s*[\"']([0-9]+)[\"']", Pattern.CASE_INSENSITIVE)
+                    val mPush = itemsPushPattern.matcher(html)
+                    var pushIdx = 0
+                    while (mPush.find()) {
+                        val name = cleanSheetName(mPush.group(1) ?: "")
+                        val gid = mPush.group(2) ?: "$pushIdx"
+                        if (name.isNotBlank()) {
+                            nameToGidMap[name] = gid
+                            if (htmlDiscoveredSheets.none { it.sheetName == name }) {
+                                htmlDiscoveredSheets.add(
+                                    DiscoveredSheet(
+                                        sheetId = gid,
+                                        sheetName = name,
+                                        index = pushIdx,
+                                        sheetType = "GRID",
+                                        hidden = false
+                                    )
+                                )
+                            }
+                            pushIdx++
+                        }
+                    }
+
+                    // Pattern 1: <li id="sheet-button-xxx">...<a ...>Sheet Name</a></li> (standard in htmlview / pubhtml)
+                    val tabPatternLi = Pattern.compile("<li[^>]*id=[\"']sheet-button-([a-zA-Z0-9_-]+)[\"'][^>]*>(.*?)</li>", Pattern.CASE_INSENSITIVE or Pattern.DOTALL)
+                    val mLi = tabPatternLi.matcher(html)
+                    var liIdx = 0
+                    while (mLi.find()) {
+                        val gid = mLi.group(1) ?: "$liIdx"
+                        val liContent = mLi.group(2) ?: ""
+                        val rawName = liContent.replace(Regex("<[^>]+>"), "").trim()
+                        val name = cleanSheetName(rawName)
+                        if (name.isNotBlank()) {
+                            nameToGidMap[name] = gid
+                            if (htmlDiscoveredSheets.none { it.sheetName == name }) {
+                                htmlDiscoveredSheets.add(
+                                    DiscoveredSheet(
+                                        sheetId = gid,
+                                        sheetName = name,
+                                        index = htmlDiscoveredSheets.size,
+                                        sheetType = "GRID",
+                                        hidden = false
+                                    )
+                                )
+                            }
+                            liIdx++
+                        }
+                    }
+
+                    // Pattern 2: Bootstrap Chunk in edit page: [0, index, "gid", [{"1": [[0, 0, "SheetName"]
+                    val chunkPattern = Pattern.compile("\\[0\\s*,\\s*(\\d+)\\s*,\\s*\\\\?\"([0-9]+)\\\\?\"\\s*,\\s*\\[\\{\\\\?\"1\\\\?\":\\s*\\[\\[\\s*0\\s*,\\s*0\\s*,\\s*\\\\?\"([^\\\\\"]+)\\\\?\"", Pattern.CASE_INSENSITIVE)
+                    val mChunk = chunkPattern.matcher(html)
+                    while (mChunk.find()) {
+                        val gid = mChunk.group(2) ?: "0"
+                        val name = cleanSheetName(mChunk.group(3) ?: "")
+                        if (name.isNotBlank()) {
+                            nameToGidMap[name] = gid
+                            if (htmlDiscoveredSheets.none { it.sheetName == name }) {
+                                htmlDiscoveredSheets.add(
+                                    DiscoveredSheet(
+                                        sheetId = gid,
+                                        sheetName = name,
+                                        index = htmlDiscoveredSheets.size,
+                                        sheetType = "GRID",
+                                        hidden = false
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Pattern 3: JSON embedded sheet attributes: "name":"SheetName","sheetId":12345
+                    val jsonSheetPattern = Pattern.compile("[\"']name[\"']\\s*:\\s*[\"']([^\"']+)[\"']\\s*,\\s*[\"']sheetId[\"']\\s*:\\s*([0-9]+)", Pattern.CASE_INSENSITIVE)
+                    val mJson = jsonSheetPattern.matcher(html)
+                    while (mJson.find()) {
+                        val sName = cleanSheetName(mJson.group(1) ?: "")
+                        val sGid = mJson.group(2) ?: "0"
+                        if (sName.isNotBlank()) {
+                            nameToGidMap[sName] = sGid
+                            if (htmlDiscoveredSheets.none { it.sheetName == sName }) {
+                                htmlDiscoveredSheets.add(
+                                    DiscoveredSheet(
+                                        sheetId = sGid,
+                                        sheetName = sName,
+                                        index = htmlDiscoveredSheets.size,
+                                        sheetType = "GRID",
+                                        hidden = false
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    if (nameToGidMap.isNotEmpty()) {
+                        break
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "HTML discovery on $pageUrl encountered: ${e.message}")
+                    if (e is UnknownHostException || e is SocketTimeoutException) {
+                        connectionError = e
+                    }
                 }
             }
 
-            // Extract initial GID from publicUrl if provided
-            val initialGid = extractSheetGid(publicUrl)
-
-            // Step 1: Query htmlview
-            val htmlUrl = "https://docs.google.com/spreadsheets/d/$spreadsheetId/htmlview"
-            val req1 = Request.Builder()
-                .url(htmlUrl)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                .build()
-
-            var html = ""
+            // Step 2: Download XLSX export stream to parse OpenXML workbook structure (xl/workbook.xml & rels & worksheets)
+            // This discovers ALL sheets regardless of how many exist (1, 5, 25, 50, 100+) with their exact titles, row counts, and column counts
             try {
-                val resp1 = client.newCall(req1).execute()
-                html = resp1.body?.string() ?: ""
-            } catch (e: Exception) {
-                Log.w(TAG, "htmlview fetch failed", e)
-            }
+                val xlsxUrls = if (publicUrl.contains("/d/e/")) {
+                    listOf(
+                        "https://docs.google.com/spreadsheets/d/e/$spreadsheetId/pub?output=xlsx",
+                        "https://docs.google.com/spreadsheets/d/e/$spreadsheetId/pub?format=xlsx"
+                    )
+                } else {
+                    listOf(
+                        "https://docs.google.com/spreadsheets/d/$spreadsheetId/export?format=xlsx",
+                        "https://docs.google.com/spreadsheets/d/$spreadsheetId/pub?output=xlsx"
+                    )
+                }
 
-            fun parseHtmlTabs(content: String) {
-                // Regex 0: Doc title <div id="doc-title"><span class="name">Doc : Sheet</span></div>
-                val docTitlePattern = Pattern.compile("<div[^>]*id=[\"']doc-title[\"'][^>]*>.*?<span[^>]*class=[\"']name[\"'][^>]*>([^<]+)</span>", Pattern.CASE_INSENSITIVE or Pattern.DOTALL)
-                val m0 = docTitlePattern.matcher(content)
-                if (m0.find()) {
-                    val fullTitle = m0.group(1) ?: ""
-                    if (fullTitle.contains(":")) {
-                        val subName = fullTitle.substringAfter(":").trim()
-                        if (subName.isNotBlank()) {
-                            addSheet("0", subName)
+                for (xlsxUrl in xlsxUrls) {
+                    val xlsxReq = Request.Builder()
+                        .url(xlsxUrl)
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                        .build()
+                    val xlsxResp = client.newCall(xlsxReq).execute()
+
+                    val requestFinalUrl = xlsxResp.request.url.toString()
+                    if (requestFinalUrl.contains("accounts.google.com") || requestFinalUrl.contains("ServiceLogin")) {
+                        xlsxResp.close()
+                        continue
+                    }
+                    if (xlsxResp.code == 404 || xlsxResp.code == 401 || xlsxResp.code == 403) {
+                        xlsxResp.close()
+                        continue
+                    }
+
+                    if (xlsxResp.isSuccessful && xlsxResp.body != null) {
+                        val xlsxBytes = xlsxResp.body!!.bytes()
+                        xlsxResp.close()
+
+                        val zipEntries = mutableMapOf<String, String>()
+                        val buffer = ByteArray(8192)
+                        ZipInputStream(ByteArrayInputStream(xlsxBytes)).use { zis ->
+                            var entry = zis.nextEntry
+                            while (entry != null) {
+                                val name = entry.name
+                                if (name == "xl/workbook.xml" || name == "xl/_rels/workbook.xml.rels" || (name.startsWith("xl/worksheets/") && name.endsWith(".xml"))) {
+                                    val baos = ByteArrayOutputStream()
+                                    var len: Int
+                                    while (zis.read(buffer).also { len = it } > 0) {
+                                        baos.write(buffer, 0, len)
+                                    }
+                                    zipEntries[name] = baos.toString("UTF-8")
+                                }
+                                zis.closeEntry()
+                                entry = zis.nextEntry
+                            }
+                        }
+
+                        val wbXml = zipEntries["xl/workbook.xml"]
+                        if (!wbXml.isNullOrBlank()) {
+                            // Parse rels map
+                            val relsXml = zipEntries["xl/_rels/workbook.xml.rels"] ?: ""
+                            val relMap = mutableMapOf<String, String>()
+                            val relPattern = Pattern.compile("<Relationship[^>]+Id=[\"']([^\"']+)[\"'][^>]+Target=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE)
+                            val mRel = relPattern.matcher(relsXml)
+                            while (mRel.find()) {
+                                val relId = mRel.group(1) ?: ""
+                                val target = mRel.group(2) ?: ""
+                                if (relId.isNotBlank() && target.isNotBlank()) {
+                                    relMap[relId] = if (target.startsWith("xl/")) target else "xl/$target"
+                                }
+                            }
+
+                            val sheetTagPattern = Pattern.compile("<sheet\\s+([^>]+)/?>", Pattern.CASE_INSENSITIVE)
+                            val nameAttrPattern = Pattern.compile("name=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE)
+                            val idAttrPattern = Pattern.compile("sheetId=[\"']?([0-9]+)[\"']?", Pattern.CASE_INSENSITIVE)
+                            val stateAttrPattern = Pattern.compile("state=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE)
+                            val rIdPattern = Pattern.compile("r:id=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE)
+
+                            val matcher = sheetTagPattern.matcher(wbXml)
+                            var sheetIndex = 0
+                            val seenNames = mutableSetOf<String>()
+
+                            while (matcher.find()) {
+                                val attrs = matcher.group(1) ?: ""
+                                val nameM = nameAttrPattern.matcher(attrs)
+                                val idM = idAttrPattern.matcher(attrs)
+                                val stateM = stateAttrPattern.matcher(attrs)
+                                val ridM = rIdPattern.matcher(attrs)
+
+                                if (nameM.find()) {
+                                    val sheetName = cleanSheetName(nameM.group(1) ?: "")
+                                    val workbookSheetId = if (idM.find()) idM.group(1) ?: "$sheetIndex" else "$sheetIndex"
+                                    val state = if (stateM.find()) stateM.group(1) ?: "visible" else "visible"
+                                    val isHidden = state.equals("hidden", ignoreCase = true)
+                                    val relId = if (ridM.find()) ridM.group(1) ?: "" else ""
+                                    val targetPath = relMap[relId] ?: "xl/worksheets/sheet${sheetIndex + 1}.xml"
+
+                                    // Extract row count and column count from worksheet xml
+                                    var rowCount = 0
+                                    var colCount = 0
+                                    val wsXml = zipEntries[targetPath]
+                                    if (!wsXml.isNullOrBlank()) {
+                                        // Count <row tags
+                                        val rowMatcher = Pattern.compile("<row[\\s>]", Pattern.CASE_INSENSITIVE).matcher(wsXml)
+                                        while (rowMatcher.find()) {
+                                            rowCount++
+                                        }
+
+                                        // Count unique columns
+                                        val colMatcher = Pattern.compile("<c\\s+[^>]*r=[\"']([A-Za-z]+)[0-9]+[\"']", Pattern.CASE_INSENSITIVE).matcher(wsXml)
+                                        val colSet = mutableSetOf<String>()
+                                        while (colMatcher.find()) {
+                                            val letters = colMatcher.group(1) ?: ""
+                                            if (letters.isNotBlank()) colSet.add(letters.uppercase())
+                                        }
+                                        colCount = colSet.size
+                                    }
+
+                                    if (sheetName.isNotBlank() && !seenNames.contains(sheetName)) {
+                                        seenNames.add(sheetName)
+                                        // Prefer real Google GID if discovered from htmlview, else workbook sheet ID
+                                        val finalGid = nameToGidMap[sheetName] ?: workbookSheetId
+                                        discoveredList.add(
+                                            DiscoveredSheet(
+                                                sheetId = finalGid,
+                                                sheetName = sheetName,
+                                                index = sheetIndex,
+                                                sheetType = "GRID",
+                                                hidden = isHidden,
+                                                rowCount = rowCount,
+                                                columnCount = colCount
+                                            )
+                                        )
+                                        sheetIndex++
+                                    }
+                                }
+                            }
+
+                            if (discoveredList.isNotEmpty()) {
+                                break
+                            }
                         }
                     }
                 }
-
-                // Regex 1: <li id="sheet-button-xxx"><a href="#xxx">Sheet Name</a></li>
-                val tabPattern1 = Pattern.compile("<li[^>]*id=[\"']sheet-button-([^\"']+)[\"'][^>]*>.*?<a[^>]*>([^<]+)</a>", Pattern.CASE_INSENSITIVE or Pattern.DOTALL)
-                val m1 = tabPattern1.matcher(content)
-                while (m1.find()) {
-                    val gid = m1.group(1) ?: "0"
-                    val name = m1.group(2) ?: ""
-                    addSheet(gid, name)
-                }
-
-                // Regex 2: <a href="#gid">Tab Name</a>
-                val tabPattern2 = Pattern.compile("<a[^>]*href=[\"']#([0-9]+)[\"'][^>]*>([^<]+)</a>", Pattern.CASE_INSENSITIVE)
-                val m2 = tabPattern2.matcher(content)
-                while (m2.find()) {
-                    val gid = m2.group(1) ?: "0"
-                    val name = m2.group(2) ?: ""
-                    if (!name.contains("Google") && !name.contains("Sheet") && !name.contains("Report") && !name.contains("Terms")) {
-                        addSheet(gid, name)
-                    }
-                }
-
-                // Regex 3: Embedded JSON data {"name": "...", "gid": ...}
-                val jsPattern1 = Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"gid\"\\s*:\\s*\"?([0-9]+)\"?", Pattern.CASE_INSENSITIVE)
-                val m3 = jsPattern1.matcher(content)
-                while (m3.find()) {
-                    val name = m3.group(1) ?: ""
-                    val gid = m3.group(2) ?: "0"
-                    addSheet(gid, name)
-                }
-
-                val jsPattern2 = Pattern.compile("\"title\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"sheetId\"\\s*:\\s*\"?([0-9]+)\"?", Pattern.CASE_INSENSITIVE)
-                val m4 = jsPattern2.matcher(content)
-                while (m4.find()) {
-                    val name = m4.group(1) ?: ""
-                    val gid = m4.group(2) ?: "0"
-                    addSheet(gid, name)
-                }
-
-                // Regex 4: Bootstrap Data format in /edit: [\"gid\",0,...],null,[[{\"2\":3,\"3\":[2,\"SheetName\"]
-                val jsPattern3 = Pattern.compile("\\[\\\\?\"([0-9]+)\\\\?\",\\s*0,[^\\]]*\\].*?\\[2,\\\\?\"([^\\\\\",\\]]+)\\\\?\"\\]", Pattern.CASE_INSENSITIVE)
-                val m5 = jsPattern3.matcher(content)
-                while (m5.find()) {
-                    val gid = m5.group(1) ?: "0"
-                    val name = m5.group(2) ?: ""
-                    if (name.length in 1..80) {
-                        addSheet(gid, name)
-                    }
+            } catch (e: Exception) {
+                Log.w(TAG, "XLSX export discovery encountered: ${e.message}")
+                if (e is UnknownHostException || e is SocketTimeoutException) {
+                    connectionError = e
                 }
             }
 
-            if (html.isNotBlank()) {
-                parseHtmlTabs(html)
+            // Step 3: If XLSX export was restricted, fall back to HTML-discovered sheets
+            if (discoveredList.isEmpty() && htmlDiscoveredSheets.isNotEmpty()) {
+                discoveredList.addAll(htmlDiscoveredSheets)
             }
 
-            // Step 2: If fewer than 2 sheets found, try /edit
-            if (sheets.size < 2) {
-                val editUrl = "https://docs.google.com/spreadsheets/d/$spreadsheetId/edit?usp=sharing"
+            // Step 4: If still empty, verify spreadsheet connectivity via gviz
+            if (discoveredList.isEmpty()) {
                 try {
-                    val editReq = Request.Builder()
-                        .url(editUrl)
+                    val gvizUrl = "https://docs.google.com/spreadsheets/d/$spreadsheetId/gviz/tq?tqx=out:json&tq=limit%201"
+                    val gvizReq = Request.Builder()
+                        .url(gvizUrl)
                         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                         .build()
-                    val editResp = client.newCall(editReq).execute()
-                    val editHtml = editResp.body?.string() ?: ""
-                    if (editHtml.isNotBlank()) {
-                        parseHtmlTabs(editHtml)
+                    val gvizResp = client.newCall(gvizReq).execute()
+                    val gvizBody = gvizResp.body?.string() ?: ""
+
+                    if (gvizResp.code == 404) {
+                        return@withContext Result.failure(Exception("الرابط غير متاح - تأكد من صحة رابط Google Sheet"))
+                    }
+                    if (gvizResp.code == 401 || gvizResp.code == 403 || gvizBody.contains("accounts.google.com") || gvizBody.contains("Sign in")) {
+                        return@withContext Result.failure(Exception("المصدر غير عام - تأكد من ضبط المشاركة على «أي شخص لديه الرابط يمكنه العرض»"))
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "edit fetch failed", e)
+                    if (e is UnknownHostException || e is SocketTimeoutException) {
+                        return@withContext Result.failure(Exception("مشكلة في الاتصال - تعذر الاتصال بـ Google Sheets، تحقق من اتصال الإنترنت"))
+                    }
                 }
             }
 
-            // Step 3: If still fewer than 2 sheets found, try pubhtml
-            if (sheets.size < 2) {
-                val pubhtmlUrl = "https://docs.google.com/spreadsheets/d/$spreadsheetId/pubhtml"
-                try {
-                    val pubReq = Request.Builder()
-                        .url(pubhtmlUrl)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                        .build()
-                    val pubResp = client.newCall(pubReq).execute()
-                    val pubHtml = pubResp.body?.string() ?: ""
-                    if (pubHtml.isNotBlank()) {
-                        parseHtmlTabs(pubHtml)
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "pubhtml fetch failed", e)
+            // If completely empty, fail with clear error
+            if (discoveredList.isEmpty()) {
+                if (connectionError != null) {
+                    return@withContext Result.failure(Exception("مشكلة في الاتصال - تعذر الاتصال بالخادم، يرجى التحقق من اتصال الإنترنت"))
                 }
+                return@withContext Result.failure(Exception("المصدر لا يحتوي على أوراق قابلة للقراءة أو تعذر قراءة Spreadsheet"))
             }
 
-            // Step 3: If an initial gid was in URL and hasn't been named yet, register it
-            if (!initialGid.isNullOrBlank() && !seenGids.contains(initialGid)) {
-                addSheet(initialGid, "الورقة الافتراضية ($initialGid)")
-            }
-
-            // Step 4: If still completely empty, add default sheet
-            if (sheets.isEmpty()) {
-                sheets.add(DiscoveredSheet(sheetId = "0", sheetName = "الطلبات (الورقة 1)"))
-            }
-
-            Result.success(sheets)
+            Result.success(discoveredList)
         } catch (e: Exception) {
-            Log.e(TAG, "Sheet discovery error", e)
-            Result.success(listOf(DiscoveredSheet(sheetId = "0", sheetName = "الطلبات (الورقة 1)")))
+            Log.e(TAG, "Sheet discovery critical error", e)
+            val msg = when {
+                e is UnknownHostException || e is SocketTimeoutException -> "مشكلة في الاتصال - تحقق من اتصال الإنترنت"
+                e.message?.contains("404") == true -> "الرابط غير متاح - لم يتم العثور على ملف Google Sheet"
+                e.message?.contains("غير عام") == true -> e.message ?: "المصدر غير عام"
+                else -> e.localizedMessage ?: "تعذر قراءة Spreadsheet"
+            }
+            Result.failure(Exception(msg))
         }
     }
 
@@ -373,19 +580,13 @@ class GoogleSheetsPublicService {
             val spreadsheetId = extractSpreadsheetId(publicUrl)
             val encodedSheet = URLEncoder.encode(sheetName, "UTF-8")
 
-            // Determine URLs to try: primary URL based on gid vs sheet name
-            val urlByGid = if (sheetGid.isNotBlank() && sheetGid != "0") {
-                "https://docs.google.com/spreadsheets/d/$spreadsheetId/gviz/tq?tqx=out:json&gid=$sheetGid"
-            } else null
-            val urlByName = "https://docs.google.com/spreadsheets/d/$spreadsheetId/gviz/tq?tqx=out:json&sheet=$encodedSheet"
-
+            // Determine URLs to try: try by gid if numeric, and by sheet name
             val urlsToTry = mutableListOf<String>()
-            if (urlByGid != null) {
-                urlsToTry.add(urlByGid)
-                urlsToTry.add(urlByName)
-            } else {
-                urlsToTry.add(urlByName)
-                urlsToTry.add("https://docs.google.com/spreadsheets/d/$spreadsheetId/gviz/tq?tqx=out:json&gid=0")
+            if (sheetGid.isNotBlank() && sheetGid.all { it.isDigit() }) {
+                urlsToTry.add("https://docs.google.com/spreadsheets/d/$spreadsheetId/gviz/tq?tqx=out:json&gid=$sheetGid")
+            }
+            if (sheetName.isNotBlank()) {
+                urlsToTry.add("https://docs.google.com/spreadsheets/d/$spreadsheetId/gviz/tq?tqx=out:json&sheet=$encodedSheet")
             }
 
             var cleanJson = ""
@@ -419,7 +620,7 @@ class GoogleSheetsPublicService {
 
             if (cleanJson.isBlank()) {
                 // FALLBACK: Attempt fetching via /export?format=csv
-                val csvGidPart = if (sheetGid.isNotBlank() && sheetGid != "0") "&gid=$sheetGid" else ""
+                val csvGidPart = if (sheetGid.isNotBlank() && sheetGid.all { it.isDigit() }) "&gid=$sheetGid" else ""
                 val csvUrl = "https://docs.google.com/spreadsheets/d/$spreadsheetId/export?format=csv$csvGidPart"
                 try {
                     val csvRequest = Request.Builder()

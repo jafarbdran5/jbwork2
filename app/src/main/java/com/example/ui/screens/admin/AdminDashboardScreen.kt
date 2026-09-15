@@ -795,8 +795,17 @@ fun AdminDashboardScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("المجال المستهدف:", fontSize = 12.sp, color = TextSecondary)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("CASES" to "قضايا", "TOOLS" to "أدوات", "FORMS" to "نماذج", "EXPENSES" to "مصاريف").forEach { (code, lbl) ->
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            "CASE_FILES" to "ملفات القضية",
+                            "CASES" to "قضايا",
+                            "TOOLS" to "أدوات",
+                            "FORMS" to "نماذج",
+                            "EXPENSES" to "مصاريف"
+                        ).forEach { (code, lbl) ->
                             Button(
                                 onClick = { cScope = code },
                                 colors = ButtonDefaults.buttonColors(
@@ -2292,6 +2301,12 @@ private fun AdminCategoriesTab(
     onDeleteCategory: (String, String) -> Unit,
     onAddNewCategory: () -> Unit
 ) {
+    var selectedScopeFilter by remember { mutableStateOf("ALL") }
+    val filteredCategories = remember(categories, selectedScopeFilter) {
+        if (selectedScopeFilter == "ALL") categories
+        else categories.filter { it.scope == selectedScopeFilter }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -2299,7 +2314,7 @@ private fun AdminCategoriesTab(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "تصنيفات المنظومة (${categories.size} تصنيف)",
+                text = "تصنيفات المنظومة (${filteredCategories.size} من ${categories.size})",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -2316,13 +2331,50 @@ private fun AdminCategoriesTab(
             }
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Filter chips for scopes
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf(
+                "ALL" to "الكل",
+                "CASE_FILES" to "ملفات القضية",
+                "CASES" to "القضايا",
+                "TOOLS" to "الأدوات",
+                "FORMS" to "النماذج",
+                "EXPENSES" to "المصاريف"
+            ).forEach { (code, label) ->
+                FilterChip(
+                    selected = selectedScopeFilter == code,
+                    onClick = { selectedScopeFilter = code },
+                    label = { Text(label, fontSize = 11.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = CyberPrimary.copy(alpha = 0.25f),
+                        selectedLabelColor = CyberPrimaryLight
+                    )
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(categories, key = { it.id }) { c ->
+            items(filteredCategories, key = { it.id }) { c ->
+                val scopeArabic = when (c.scope) {
+                    "CASE_FILES" -> "ملفات القضية"
+                    "CASES" -> "قضايا"
+                    "TOOLS" -> "أدوات"
+                    "FORMS" -> "نماذج"
+                    "EXPENSES" -> "مصاريف"
+                    else -> c.scope
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = CyberCard),
@@ -2354,7 +2406,7 @@ private fun AdminCategoriesTab(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(text = c.name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    CyberBadge(text = "المجال: ${c.scope}", accentColor = CyberSecondary)
+                                    CyberBadge(text = scopeArabic, accentColor = if (c.scope == "CASE_FILES") CyberPrimary else CyberSecondary)
                                 }
                                 Text(text = "رمز اللون: ${c.color.ifBlank { "افتراضي" }}", fontSize = 11.sp, color = TextMuted)
                             }

@@ -85,6 +85,10 @@ fun ExternalSheetsManagerDialog(
 ) {
     val allSheets by viewModel.rawExternalSheets.collectAsState()
     val allRequests by viewModel.rawExternalRequests.collectAsState()
+    val discoveryErrors by viewModel.sheetDiscoveryErrors.collectAsState()
+    val isRefreshingMap by viewModel.isRefreshingSheets.collectAsState()
+    val isRefreshing = isRefreshingMap[source.id] == true
+    val sourceDiscoveryError = discoveryErrors[source.id]
     val sourceSheets = allSheets.filter { it.sourceId == source.id }
 
     var sheetFilter by remember { mutableStateOf("الكل") }
@@ -211,12 +215,17 @@ fun ExternalSheetsManagerDialog(
 
                                 OutlinedButton(
                                     onClick = { viewModel.refreshSheetsForSource(source.id) },
+                                    enabled = !isRefreshing,
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.height(34.dp)
                                 ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    if (isRefreshing) {
+                                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    }
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("فحص الأوراق الجديدة", fontSize = 11.sp)
+                                    Text("تحديث الأوراق", fontSize = 11.sp)
                                 }
 
                                 Button(
@@ -227,7 +236,7 @@ fun ExternalSheetsManagerDialog(
                                 ) {
                                     Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("مزامنة المصدر", fontSize = 11.sp)
+                                    Text("مزامنة كل الأوراق", fontSize = 11.sp)
                                 }
                             }
                         }
@@ -290,27 +299,84 @@ fun ExternalSheetsManagerDialog(
                             .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.TableChart,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = if (sourceSheets.isEmpty()) "لم يتم اكتشاف أوراق عمل بعد في هذا الملف." else "لا توجد أوراق تطابق خيارات البحث/التصفية.",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            if (sourceSheets.isEmpty()) {
-                                Button(
-                                    onClick = { viewModel.refreshSheetsForSource(source.id) },
-                                    shape = RoundedCornerShape(8.dp)
+                        if (isRefreshing) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(modifier = Modifier.size(40.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text(
+                                    text = "جاري قراءة أوراق العمل واكتشافها تلقائياً من Google Sheets...",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else if (sourceSheets.isEmpty()) {
+                            Surface(
+                                color = Color(0xFFD32F2F).copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(16.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD32F2F).copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .fillMaxWidth(0.92f)
+                                    .padding(16.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Text("اضغط هنا لفحص أوراق Google Sheets", fontSize = 12.sp)
+                                    Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color(0xFFD32F2F),
+                                        modifier = Modifier.size(44.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = "تعذر قراءة أوراق العمل تلقائياً",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFD32F2F)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = sourceDiscoveryError ?: "المصدر لا يحتوي على أوراق قابلة للقراءة أو تعذر قراءة بنية الـ Spreadsheet.",
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "يرجى التأكد من أن الرابط متاح وأن مشاركة الملف مضبوطة على: «أي شخص لديه الرابط يمكنه العرض».",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(
+                                        onClick = { viewModel.refreshSheetsForSource(source.id) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(40.dp)
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("إعادة المحاولة", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
+                            }
+                        } else {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Default.TableChart,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "لا توجد أوراق تطابق خيارات البحث أو التصفية الحالية.",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
@@ -471,6 +537,19 @@ private fun SheetCardItem(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                text = "#${sheet.index + 1}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                         Text(
                             text = sheet.customDisplayName ?: sheet.sheetName,
                             fontSize = 15.sp,
@@ -493,10 +572,53 @@ private fun SheetCardItem(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(3.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = "معرّف (GID): ${sheet.sheetId}",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                        if (sheet.sheetType.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                            ) {
+                                Text(
+                                    text = sheet.sheetType,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                        if (sheet.hidden) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFFF57C00).copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "مخفية",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFFE65100),
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "الصفوف في الورقة: ${sheet.rowCount} • الطلبات المسجلة محلياً: $requestsCount",
+                        text = "الصفوف: ${sheet.rowCount} • الأعمدة: ${sheet.columnCount} • الطلبات المستوردة: $requestsCount",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -573,7 +695,7 @@ private fun SheetCardItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("استيراد الطلبات:", fontSize = 12.sp)
+                    Text("تفعيل الورقة للاستيراد:", fontSize = 12.sp)
                     Spacer(modifier = Modifier.width(6.dp))
                     Switch(
                         checked = sheet.enabled && !sheet.ignored,
@@ -583,7 +705,7 @@ private fun SheetCardItem(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("تجاهل واستثناء:", fontSize = 12.sp)
+                    Text(if (sheet.ignored) "تجاهل الورقة (مفعّل):" else "تجاهل الورقة:", fontSize = 12.sp)
                     Spacer(modifier = Modifier.width(6.dp))
                     Switch(
                         checked = sheet.ignored,
@@ -610,7 +732,7 @@ private fun SheetCardItem(
                     ) {
                         Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("مزامنة الورقة", fontSize = 11.sp)
+                        Text("مزامنة هذه الورقة فقط", fontSize = 11.sp)
                     }
 
                     OutlinedButton(
@@ -620,7 +742,7 @@ private fun SheetCardItem(
                     ) {
                         Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("ربط الأعمدة", fontSize = 11.sp)
+                        Text("إعداد ربط الأعمدة", fontSize = 11.sp)
                     }
 
                     OutlinedButton(
@@ -630,7 +752,7 @@ private fun SheetCardItem(
                     ) {
                         Icon(Icons.Default.TableChart, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("معاينة", fontSize = 11.sp)
+                        Text("عرض بيانات الورقة", fontSize = 11.sp)
                     }
 
                     OutlinedButton(

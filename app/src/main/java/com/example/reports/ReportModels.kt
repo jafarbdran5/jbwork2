@@ -37,6 +37,29 @@ data class ReportPaymentSummary(
     val paymentsCount: Int
 )
 
+enum class LogoPosition(val displayName: String) {
+    RIGHT("يمين"),
+    CENTER("وسط"),
+    LEFT("يسار")
+}
+
+enum class LogoSize(val displayName: String, val heightPx: Float) {
+    SMALL("صغير", 40f),
+    MEDIUM("متوسط", 58f),
+    LARGE("كبير", 76f)
+}
+
+enum class ReportSection(val id: String, val titleAr: String) {
+    CASE_DETAILS("case_details", "بيانات القضية والعميل"),
+    EXECUTIVE_SUMMARY("exec_summary", "المقدمة والملخص التنفيذي"),
+    TECHNICAL_ANALYSIS("tech_analysis", "المحتوى والتحليل الفني الجنائي"),
+    EVIDENCE_LEDGER("evidence_ledger", "سجل الأدلة والمرفقات الرقمية"),
+    CUSTOM_NOTES("custom_notes", "الملاحظات والتوجيهات الإضافية"),
+    RECOMMENDATIONS("recommendations", "التوصيات والإجراءات الأمنية"),
+    FINANCIAL_SUMMARY("financial_summary", "الملخص المالي والمستحقات"),
+    SIGNATURE("signature", "التوقيع والخاتمة المعتمدة")
+}
+
 data class FullForensicReport(
     val reportId: String,
     val title: String,
@@ -63,7 +86,14 @@ data class FullForensicReport(
     val finalOutcome: String,
     val securityRecommendations: List<String>,
     val paymentsSummary: ReportPaymentSummary? = null,
-    val digitalVerificationHash: String = ""
+    val digitalVerificationHash: String = "",
+    val logoPath: String? = null,
+    val showLogo: Boolean = true,
+    val logoPosition: LogoPosition = LogoPosition.RIGHT,
+    val logoSize: LogoSize = LogoSize.MEDIUM,
+    val visibleSections: List<ReportSection> = ReportSection.entries.toList(),
+    val customNotesList: List<String> = emptyList(),
+    val customConclusion: String = "تم فحص واعتماد هذا التقرير الجنائي وفق الضوابط والمعايير الرقمية المعتمدة."
 )
 
 enum class ReportExportFormat(

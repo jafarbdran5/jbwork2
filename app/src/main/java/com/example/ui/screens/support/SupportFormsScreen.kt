@@ -8,6 +8,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -159,24 +161,24 @@ fun SupportFormsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Header Banner
+            // Header Banner - Compact
             SupportFormsHeader(
                 totalCount = forms.size,
                 verifiedCount = forms.count { it.verified }
             )
 
-            // Search Box
+            // Search Box - Compact & Responsive
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.supportFormSearchQuery.value = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
                     .testTag("support_form_search_field"),
                 placeholder = {
                     Text(
-                        "ابحث باسم المنصة، نوع المشكلة (ابتزاز، اختراق، استعادة...) أو الرابط",
-                        fontSize = 12.sp,
+                        "ابحث بالمنصة، نوع المشكلة (ابتزاز، اختراق...) أو الرابط",
+                        fontSize = 11.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 },
@@ -184,7 +186,8 @@ fun SupportFormsScreen(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "بحث",
-                        tint = CyberPrimaryLight
+                        tint = CyberPrimaryLight,
+                        modifier = Modifier.size(18.dp)
                     )
                 },
                 trailingIcon = {
@@ -193,13 +196,14 @@ fun SupportFormsScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "مسح",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = CyberPrimary,
                     unfocusedBorderColor = CyberBorder,
@@ -208,20 +212,20 @@ fun SupportFormsScreen(
                 )
             )
 
-            // Horizontal Filters: Companies
+            // Horizontal Filters: Companies (Compact)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 SUPPORT_COMPANIES.forEach { company ->
                     val isSelected = companyFilter == company
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.supportFormCompanyFilter.value = company },
-                        label = { Text(company, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(company, fontSize = 10.5.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = CyberPrimary.copy(alpha = 0.2f),
                             selectedLabelColor = CyberPrimaryLight,
@@ -236,20 +240,20 @@ fun SupportFormsScreen(
                 }
             }
 
-            // Horizontal Filters: Problem Types
+            // Horizontal Filters: Problem Types (Compact)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 SUPPORT_PROBLEM_TYPES.forEach { problem ->
                     val isSelected = problemFilter == problem
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.supportFormProblemFilter.value = problem },
-                        label = { Text(problem, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(problem, fontSize = 10.5.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = CyberSecondary.copy(alpha = 0.2f),
                             selectedLabelColor = CyberSecondary,
@@ -264,11 +268,11 @@ fun SupportFormsScreen(
                 }
             }
 
-            // Quick Toggles Row (Direct Forms only, Verified only)
+            // Quick Toggles Row (Compact)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -280,9 +284,9 @@ fun SupportFormsScreen(
                         imageVector = Icons.Default.Verified,
                         contentDescription = null,
                         tint = CyberSuccess,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(15.dp)
                     )
-                    Text("روابط رسمية ومتحققة فقط", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text("روابط رسمية ومتحققة فقط", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurface)
                 }
                 Switch(
                     checked = verifiedOnly,
@@ -290,7 +294,8 @@ fun SupportFormsScreen(
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = CyberSuccess,
                         checkedTrackColor = CyberSuccess.copy(alpha = 0.3f)
-                    )
+                    ),
+                    modifier = Modifier.size(width = 44.dp, height = 24.dp)
                 )
             }
 
@@ -299,37 +304,37 @@ fun SupportFormsScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(32.dp),
+                        .padding(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = null,
                             tint = TextMuted,
-                            modifier = Modifier.size(54.dp)
+                            modifier = Modifier.size(44.dp)
                         )
                         Text(
                             text = "لم يتم العثور على نماذج مطابقة لبحثك",
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "جرّب تغيير الفلاتر أو إزالة شروط البحث للعثور على النموذج المطلوب",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
+                            fontSize = 11.5.sp
                         )
                     }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(forms, key = { it.id }) { form ->
                         SupportFormCard(
@@ -386,56 +391,64 @@ private fun SupportFormsHeader(totalCount: Int, verifiedCount: Int) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .border(1.dp, CyberBorder, RoundedCornerShape(14.dp)),
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .border(1.dp, CyberBorder, RoundedCornerShape(10.dp)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(14.dp)
+        shape = RoundedCornerShape(10.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = CyberPrimaryLight,
-                        modifier = Modifier.size(18.dp)
-                    )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = CyberPrimaryLight,
+                    modifier = Modifier.size(16.dp)
+                )
+                Column {
                     Text(
                         text = "نماذج الدعم المباشرة الرسمية",
-                        fontSize = 15.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    Text(
+                        text = "روابط تقديم البلاغات واستعادة الحسابات دون وسيط",
+                        fontSize = 10.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "روابط تقديم البلاغات واستعادة الحسابات مباشرة لدى المنصات العالمية دون وسيط",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(6.dp))
                     .background(CyberSuccess.copy(alpha = 0.15f))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "$totalCount نموذج", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CyberSuccess)
-                    Text(text = "$verifiedCount موثق", fontSize = 9.sp, color = CyberSuccess)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(text = "$totalCount نموذج", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CyberSuccess)
+                    Text(text = "•", fontSize = 9.sp, color = CyberSuccess)
+                    Text(text = "$verifiedCount موثق", fontSize = 10.sp, color = CyberSuccess)
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SupportFormCard(
     form: SupportFormEntity,
@@ -448,42 +461,45 @@ fun SupportFormCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, CyberBorder, RoundedCornerShape(12.dp)),
+            .border(1.dp, CyberBorder, RoundedCornerShape(10.dp)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(10.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            // Top Row: Company Badge & Verification
-            Row(
+        Column(modifier = Modifier.padding(10.dp)) {
+            // Top Row: Company Badge & Verification - Using FlowRow to avoid overflows
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(CyberPrimary.copy(alpha = 0.15f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = form.company,
                             color = CyberPrimaryLight,
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(CyberSecondary.copy(alpha = 0.15f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = form.problemType,
                             color = CyberSecondary,
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -494,34 +510,36 @@ fun SupportFormCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(CyberSuccess.copy(alpha = 0.12f))
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Verified,
                             contentDescription = "رسمي",
                             tint = CyberSuccess,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(12.dp)
                         )
                         Text(
                             text = "رابط رسمي مباشر",
                             color = CyberSuccess,
-                            fontSize = 10.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Form Name
             Text(
                 text = form.formName,
-                fontSize = 15.sp,
+                fontSize = 13.5.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
 
             // Direct URL
@@ -533,17 +551,17 @@ fun SupportFormCard(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .padding(horizontal = 7.dp, vertical = 3.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Link,
                     contentDescription = null,
                     tint = CyberPrimaryLight,
-                    modifier = Modifier.size(13.dp)
+                    modifier = Modifier.size(12.dp)
                 )
                 Text(
                     text = form.formUrl,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     color = CyberPrimaryLight,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -553,64 +571,66 @@ fun SupportFormCard(
 
             // Requirements / Guidance
             if (form.notes.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(6.dp))
                         .background(CyberWarning.copy(alpha = 0.1f))
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                        .padding(horizontal = 7.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = null,
                         tint = CyberWarning,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                     Text(
                         text = form.notes,
-                        fontSize = 11.sp,
+                        fontSize = 10.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 15.sp
+                        lineHeight = 14.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Action Buttons Row
+            // Action Buttons Row - Compact & responsive
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 // Primary Action: Open Official URL directly
                 Button(
                     onClick = onOpen,
                     modifier = Modifier
                         .weight(1f)
-                        .height(38.dp)
+                        .height(34.dp)
                         .testTag("open_form_button_${form.id}"),
                     colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp)
+                    shape = RoundedCornerShape(7.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.OpenInBrowser,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Text(
-                            text = "فتح النموذج الرسمي",
+                            text = "فتح النموذج",
                             color = Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -620,14 +640,14 @@ fun SupportFormCard(
                 IconButton(
                     onClick = onCopy,
                     modifier = Modifier
-                        .size(38.dp)
-                        .border(1.dp, CyberBorder, RoundedCornerShape(8.dp))
+                        .size(34.dp)
+                        .border(1.dp, CyberBorder, RoundedCornerShape(7.dp))
                 ) {
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
                         contentDescription = "نسخ الرابط",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                 }
 
@@ -635,14 +655,14 @@ fun SupportFormCard(
                 IconButton(
                     onClick = onShare,
                     modifier = Modifier
-                        .size(38.dp)
-                        .border(1.dp, CyberBorder, RoundedCornerShape(8.dp))
+                        .size(34.dp)
+                        .border(1.dp, CyberBorder, RoundedCornerShape(7.dp))
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
                         contentDescription = "مشاركة",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                 }
 
@@ -650,14 +670,14 @@ fun SupportFormCard(
                 IconButton(
                     onClick = onLinkToCase,
                     modifier = Modifier
-                        .size(38.dp)
-                        .border(1.dp, CyberSecondary.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .size(34.dp)
+                        .border(1.dp, CyberSecondary.copy(alpha = 0.5f), RoundedCornerShape(7.dp))
                 ) {
                     Icon(
                         imageVector = Icons.Default.AddLink,
                         contentDescription = "ربط بقضية",
                         tint = CyberSecondary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -685,7 +705,8 @@ fun LinkSupportFormToCaseSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .verticalScroll(rememberScrollState())
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -694,12 +715,12 @@ fun LinkSupportFormToCaseSheet(
             ) {
                 Text(
                     text = "ربط نموذج الدعم بملف القضية",
-                    fontSize = 17.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "إغلاق")
+                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "إغلاق", modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -709,49 +730,47 @@ fun LinkSupportFormToCaseSheet(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, CyberBorder, RoundedCornerShape(10.dp)),
+                    .border(1.dp, CyberBorder, RoundedCornerShape(8.dp)),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(10.dp)) {
                     Text(
                         text = form.formName,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "${form.company} • ${form.problemType}",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = CyberPrimaryLight
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
                 text = "اختر القضية المراد ربط النموذج بها:",
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             if (cases.isEmpty()) {
                 Text(
                     text = "لا توجد قضايا نشطة حالياً. يرجى إنشاء قضية أولاً.",
-                    fontSize = 12.sp,
+                    fontSize = 11.5.sp,
                     color = CyberWarning
                 )
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(cases, key = { it.id }) { c ->
+                    cases.forEach { c ->
                         val isSelected = selectedCaseId == c.id
                         Card(
                             modifier = Modifier
@@ -769,20 +788,20 @@ fun LinkSupportFormToCaseSheet(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(10.dp),
+                                    .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = "${c.caseNumber} - ${c.title}",
-                                        fontSize = 13.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = "العميل: ${c.clientName} | الأولوية: ${c.priority}",
-                                        fontSize = 11.sp,
+                                        fontSize = 10.5.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -791,7 +810,7 @@ fun LinkSupportFormToCaseSheet(
                                         imageVector = Icons.Default.CheckCircle,
                                         contentDescription = null,
                                         tint = CyberPrimary,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
@@ -800,29 +819,29 @@ fun LinkSupportFormToCaseSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Notes
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
-                label = { Text("ملاحظات التوثيق (اختياري)") },
-                placeholder = { Text("مثال: تم إرسال البلاغ برقم تذكرة #49281 الساعة 11:30 صباحاً") },
+                label = { Text("ملاحظات التوثيق (اختياري)", fontSize = 11.5.sp) },
+                placeholder = { Text("مثال: تم إرسال البلاغ برقم تذكرة #49281 الساعة 11:30 صباحاً", fontSize = 11.sp) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(8.dp),
                 maxLines = 3
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Button(
                 onClick = { onConfirmLink(selectedCaseId, notes) },
                 enabled = selectedCaseId.isNotBlank(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp),
+                    .height(40.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(8.dp)
             ) {
                 Text("تأكيد ربط النموذج بالقضية", fontWeight = FontWeight.Bold)
             }

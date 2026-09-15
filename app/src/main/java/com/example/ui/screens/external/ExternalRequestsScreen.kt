@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Layers
@@ -71,6 +72,7 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -362,7 +364,7 @@ fun ExternalRequestsScreen(
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("إضافة مصدر Google Sheet الآن", fontSize = 12.sp)
+                                    Text("إضافة مصدر Google Sheet", fontSize = 12.sp)
                                 }
                             }
                         }
@@ -446,38 +448,80 @@ fun ExternalRequestsScreen(
                 val relevantSheets = if (sourceFilter != "الكل") sheets.filter { it.sourceId == sourceFilter } else sheets
                 if (relevantSheets.isNotEmpty()) {
                     item(key = "sheets_filter_row") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text("الورقة:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                            FilterChip(
-                                selected = sheetFilter == "الكل",
-                                onClick = { viewModel.externalRequestSheetFilter.value = "الكل" },
-                                label = { Text("كل الأوراق (${filteredRequests.size})", fontSize = 11.sp) },
-                                shape = RoundedCornerShape(8.dp)
-                            )
-
-                            relevantSheets.forEach { sh ->
-                                val count = rawRequests.count {
-                                    it.sourceId == sh.sourceId && (it.sheetId == sh.sheetId || it.sheetId == sh.id || it.sheetName == sh.sheetName)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Layers,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "أوراق العمل (${relevantSheets.size} ورقة)",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
-                                val isSelected = sheetFilter == sh.sheetId || sheetFilter == sh.id || sheetFilter == sh.sheetName
+                                if (sources.isNotEmpty()) {
+                                    TextButton(
+                                        onClick = {
+                                            val targetSrc = if (sourceFilter != "الكل") {
+                                                sources.find { it.id == sourceFilter } ?: sources.first()
+                                            } else {
+                                                sources.first()
+                                            }
+                                            sourceForSheetsManager = targetSrc
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("إدارة كافة الأوراق (${relevantSheets.size})", fontSize = 11.sp)
+                                    }
+                                }
+                            }
 
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        viewModel.externalRequestSheetFilter.value = if (isSelected) "الكل" else sh.sheetId
-                                    },
-                                    label = {
-                                        Text("${sh.customDisplayName ?: sh.sheetName} ($count)", fontSize = 11.sp)
-                                    },
+                                    selected = sheetFilter == "الكل",
+                                    onClick = { viewModel.externalRequestSheetFilter.value = "الكل" },
+                                    label = { Text("كل الأوراق (${filteredRequests.size})", fontSize = 11.sp) },
                                     shape = RoundedCornerShape(8.dp)
                                 )
+
+                                relevantSheets.forEach { sh ->
+                                    val count = rawRequests.count {
+                                        it.sourceId == sh.sourceId && (it.sheetId == sh.sheetId || it.sheetId == sh.id || it.sheetName == sh.sheetName)
+                                    }
+                                    val isSelected = sheetFilter == sh.sheetId || sheetFilter == sh.id || sheetFilter == sh.sheetName
+
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            viewModel.externalRequestSheetFilter.value = if (isSelected) "الكل" else sh.sheetId
+                                        },
+                                        label = {
+                                            Text("${sh.customDisplayName ?: sh.sheetName} ($count)", fontSize = 11.sp)
+                                        },
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -546,7 +590,7 @@ fun ExternalRequestsScreen(
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("إضافة مصدر Google Sheet الآن", fontSize = 12.sp)
+                                    Text("إضافة مصدر Google Sheet", fontSize = 12.sp)
                                 }
                             }
                         }

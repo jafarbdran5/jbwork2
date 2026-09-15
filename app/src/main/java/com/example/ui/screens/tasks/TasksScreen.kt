@@ -62,6 +62,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.testTag
 import com.example.data.local.entities.CaseEntity
 import com.example.data.local.entities.TaskEntity
 import com.example.ui.theme.CyberBorder
@@ -120,23 +125,25 @@ fun TasksScreen(viewModel: ForensicViewModel) {
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Search Bar
+            // Search Bar - Compact & Responsive
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.taskSearchQuery.value = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("ابحث في المهام، القضايا، أو الوصف...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("tasks_search_field"),
+                placeholder = { Text("ابحث في المهام، القضايا، أو الوصف...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = CyberPrimaryLight, modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.taskSearchQuery.value = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Default.Close, contentDescription = "مسح", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                         }
                     }
                 },
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = CyberPrimary,
                     unfocusedBorderColor = CyberBorder,
@@ -148,59 +155,69 @@ fun TasksScreen(viewModel: ForensicViewModel) {
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Filter Chips (Status)
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Consolidated Compact Filter Chips (Status & Priority in ergonomic horizontal scroll)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(statuses) { status ->
-                    val isSelected = statusFilter == status
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (isSelected) CyberPrimary else MaterialTheme.colorScheme.surfaceVariant)
-                            .border(1.dp, if (isSelected) CyberPrimaryLight else CyberBorder, RoundedCornerShape(20.dp))
-                            .clickable { viewModel.taskStatusFilter.value = status }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = status,
-                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    items(statuses) { status ->
+                        val isSelected = statusFilter == status
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isSelected) CyberPrimary else MaterialTheme.colorScheme.surfaceVariant)
+                                .border(1.dp, if (isSelected) CyberPrimaryLight else CyberBorder, RoundedCornerShape(16.dp))
+                                .clickable { viewModel.taskStatusFilter.value = status }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = status,
+                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Filter Chips (Priority)
+            // Compact Priority Filter Row
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp)
             ) {
                 items(priorities) { priority ->
                     val isSelected = priorityFilter == priority
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .background(if (isSelected) CyberSecondary else MaterialTheme.colorScheme.surfaceVariant)
-                            .border(1.dp, if (isSelected) CyberSecondary else CyberBorder, RoundedCornerShape(20.dp))
+                            .border(1.dp, if (isSelected) CyberSecondary else CyberBorder, RoundedCornerShape(16.dp))
                             .clickable { viewModel.taskPriorityFilter.value = priority }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = if (priority == "الكل") "كل الأولويات" else priority,
                             color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Tasks List
             if (tasks.isEmpty()) {
@@ -214,22 +231,22 @@ fun TasksScreen(viewModel: ForensicViewModel) {
                         Icon(
                             imageVector = Icons.Default.Assignment,
                             contentDescription = null,
-                            modifier = Modifier.size(54.dp),
+                            modifier = Modifier.size(46.dp),
                             tint = TextMuted
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "لا توجد مهام مطابقة لخيارات التصفية الحالية",
+                            text = "لا توجد مهام مطابقة للتصفية الحالية",
                             color = TextMuted,
-                            fontSize = 14.sp
+                            fontSize = 13.sp
                         )
                     }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 96.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(top = 2.dp, bottom = 84.dp)
                 ) {
                     items(tasks, key = { it.id }) { task ->
                         TaskItemCard(
@@ -273,6 +290,7 @@ fun TasksScreen(viewModel: ForensicViewModel) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TaskItemCard(
     task: TaskEntity,
@@ -284,11 +302,13 @@ fun TaskItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, CyberBorder, RoundedCornerShape(14.dp)),
+            .border(1.dp, CyberBorder, RoundedCornerShape(10.dp))
+            .clickable { onToggle() }
+            .testTag("task_item_${task.id}"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(14.dp)
+        shape = RoundedCornerShape(10.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -297,7 +317,7 @@ fun TaskItemCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Checkbox(
                         checked = isCompleted,
@@ -306,25 +326,26 @@ fun TaskItemCard(
                             checkedColor = CyberSuccess,
                             uncheckedColor = TextMuted,
                             checkmarkColor = TextPrimary
-                        )
+                        ),
+                        modifier = Modifier.size(24.dp)
                     )
 
                     Text(
                         text = task.title,
                         color = if (isCompleted) TextMuted else MaterialTheme.colorScheme.onSurface,
-                        fontSize = 15.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Row {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = CyberDanger, modifier = Modifier.size(18.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = CyberDanger, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -333,25 +354,28 @@ fun TaskItemCard(
                 Text(
                     text = task.description,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
+                    fontSize = 11.5.sp,
+                    modifier = Modifier.padding(start = 30.dp, end = 4.dp, top = 2.dp, bottom = 4.dp),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Badges Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Badges FlowRow - Adaptive and won't overflow
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 30.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // Priority Badge
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(4.dp))
                         .background(
                             when (task.priority) {
                                 "حرجة" -> CyberDanger.copy(alpha = 0.15f)
@@ -360,32 +384,32 @@ fun TaskItemCard(
                                 else -> CyberSuccess.copy(alpha = 0.15f)
                             }
                         )
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "الأولوية: ${task.priority}",
+                        text = task.priority,
                         color = when (task.priority) {
                             "حرجة" -> CyberDanger
                             "عالية" -> CyberWarning
                             "متوسطة" -> CyberInfo
                             else -> CyberSuccess
                         },
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
                 // Status Badge
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(4.dp))
                         .background(CyberPrimary.copy(alpha = 0.15f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = task.status,
                         color = CyberPrimaryLight,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -394,14 +418,17 @@ fun TaskItemCard(
                 Text(
                     text = "الموعد: ${task.dueDate}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
+                    fontSize = 10.sp,
+                    modifier = Modifier.align(Alignment.CenterVertically)
                 )
 
                 task.relatedCaseNumber?.let { caseNum ->
                     Text(
-                        text = "• القضية: $caseNum",
+                        text = "• قضية $caseNum",
                         color = CyberPrimaryLight,
-                        fontSize = 11.sp
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.align(Alignment.CenterVertically)
                     )
                 }
             }
@@ -430,8 +457,9 @@ fun TaskEditorSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-            .padding(bottom = 36.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(bottom = 24.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -441,94 +469,129 @@ fun TaskEditorSheet(
             Text(
                 text = if (isNew) "إضافة مهمة عمل جديدة" else "تعديل بيانات المهمة",
                 color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
-            IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
-            label = { Text("عنوان المهمة") },
+            label = { Text("عنوان المهمة", fontSize = 12.sp) },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp)
+            shape = RoundedCornerShape(8.dp),
+            singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedTextField(
             value = description,
             onValueChange = { description = it },
-            label = { Text("تفاصيل وتوجيهات المهمة") },
+            label = { Text("تفاصيل وتوجيهات المهمة", fontSize = 12.sp) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 2,
-            shape = RoundedCornerShape(10.dp)
+            maxLines = 4,
+            shape = RoundedCornerShape(8.dp)
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedTextField(
             value = dueDate,
             onValueChange = { dueDate = it },
-            label = { Text("تاريخ أو وقت التسليم / الموعد") },
+            label = { Text("تاريخ أو وقت التسليم / الموعد", fontSize = 12.sp) },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp)
+            shape = RoundedCornerShape(8.dp),
+            singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        if (cases.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text("ربط بقضية (اختياري):", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.5.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                item {
+                    val isNone = selectedCaseId.isEmpty()
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isNone) CyberPrimary else MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { selectedCaseId = "" }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("بدون قضية", color = if (isNone) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                    }
+                }
+                items(cases.take(10)) { c ->
+                    val isSelected = selectedCaseId == c.id
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isSelected) CyberPrimary else MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { selectedCaseId = c.id }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(c.caseNumber, color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
 
-        Text("مستوى الأولوية:", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text("مستوى الأولوية:", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.5.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             priorities.forEach { p ->
                 val isSelected = priority == p
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(6.dp))
                         .background(if (isSelected) CyberPrimary else MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { priority = p }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Text(
                         text = p,
                         color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        Text("حالة المهمة:", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("حالة المهمة:", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.5.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             statuses.forEach { s ->
                 val isSelected = status == s
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(6.dp))
                         .background(if (isSelected) CyberSecondary else MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { status = s }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Text(
                         text = s,
                         color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Button(
             onClick = {
@@ -550,15 +613,15 @@ fun TaskEditorSheet(
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(8.dp),
             enabled = title.isNotBlank()
         ) {
             Text(
-                text = if (isNew) "حفظ المهمة في جدول العمل" else "تحديث المهمة",
+                text = if (isNew) "حفظ المهمة" else "تحديث المهمة",
                 color = Color.White,
-                fontSize = 15.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 4.dp)
+                modifier = Modifier.padding(vertical = 2.dp)
             )
         }
     }

@@ -42,16 +42,16 @@ interface ExternalRequestSourceDao {
 
 @Dao
 interface ExternalSheetDao {
-    @Query("SELECT * FROM external_sheets ORDER BY sheetName ASC")
+    @Query("SELECT * FROM external_sheets ORDER BY `index` ASC, sheetName ASC")
     fun getAllSheets(): Flow<List<ExternalSheetEntity>>
 
     @Query("SELECT * FROM external_sheets")
     suspend fun getAllSheetsList(): List<ExternalSheetEntity>
 
-    @Query("SELECT * FROM external_sheets WHERE sourceId = :sourceId ORDER BY sheetName ASC")
+    @Query("SELECT * FROM external_sheets WHERE sourceId = :sourceId ORDER BY `index` ASC, sheetName ASC")
     fun getSheetsForSource(sourceId: String): Flow<List<ExternalSheetEntity>>
 
-    @Query("SELECT * FROM external_sheets WHERE sourceId = :sourceId")
+    @Query("SELECT * FROM external_sheets WHERE sourceId = :sourceId ORDER BY `index` ASC, sheetName ASC")
     suspend fun getSheetsForSourceSync(sourceId: String): List<ExternalSheetEntity>
 
     @Query("SELECT * FROM external_sheets WHERE id = :id LIMIT 1")
@@ -83,6 +83,12 @@ interface ExternalSheetDao {
 
     @Query("UPDATE external_sheets SET sheetName = :name WHERE id = :id")
     suspend fun updateSheetName(id: String, name: String)
+
+    @Query("UPDATE external_sheets SET sheetName = :name, `index` = :index WHERE id = :id")
+    suspend fun updateSheetMetadata(id: String, name: String, index: Int)
+
+    @Query("UPDATE external_sheets SET sheetName = :name, `index` = :index, rowCount = :rowCount, columnCount = :colCount, sheetType = :sheetType, hidden = :hidden WHERE id = :id")
+    suspend fun updateSheetFullMetadata(id: String, name: String, index: Int, rowCount: Int, colCount: Int, sheetType: String, hidden: Boolean)
 
     @Query("DELETE FROM external_sheets WHERE sourceId = :sourceId")
     suspend fun deleteBySourceId(sourceId: String)

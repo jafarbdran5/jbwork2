@@ -2,6 +2,8 @@ package com.example.reports
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
@@ -104,16 +106,17 @@ object ReportExporter {
         val pageWidth = 595 // Standard A4 width at 72dpi
         val pageHeight = 842 // Standard A4 height at 72dpi
 
-        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
-        val page = document.startPage(pageInfo)
-        val canvas = page.canvas
+        var pageNumber = 1
+        var page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+        var canvas = page.canvas
 
         // Header Background Banner
         val headerPaint = Paint().apply {
             color = Color.rgb(18, 30, 49) // Deep Navy
             style = Paint.Style.FILL
         }
-        canvas.drawRect(0f, 0f, pageWidth.toFloat(), 110f, headerPaint)
+        val headerHeight = 115f
+        canvas.drawRect(0f, 0f, pageWidth.toFloat(), headerHeight, headerPaint)
 
         // Accent gold line
         val goldPaint = Paint().apply {
@@ -121,7 +124,46 @@ object ReportExporter {
             strokeWidth = 4f
             style = Paint.Style.STROKE
         }
-        canvas.drawLine(0f, 110f, pageWidth.toFloat(), 110f, goldPaint)
+        canvas.drawLine(0f, headerHeight, pageWidth.toFloat(), headerHeight, goldPaint)
+
+        // Load Real Logo if provided and enabled
+        val logoBitmap: Bitmap? = if (report.showLogo && !report.logoPath.isNullOrBlank()) {
+            try {
+                BitmapFactory.decodeFile(report.logoPath)
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+
+        var titleRightMargin = 24f
+        var logoLeftOffset = 24f
+
+        if (logoBitmap != null) {
+            val targetH = report.logoSize.heightPx
+            val aspect = logoBitmap.width.toFloat() / logoBitmap.height.toFloat().coerceAtLeast(1f)
+            val targetW = (targetH * aspect).coerceIn(20f, 160f)
+            val scaled = Bitmap.createScaledBitmap(logoBitmap, targetW.toInt().coerceAtLeast(1), targetH.toInt().coerceAtLeast(1), true)
+
+            when (report.logoPosition) {
+                LogoPosition.RIGHT -> {
+                    val x = pageWidth - 24f - targetW
+                    val y = (headerHeight - targetH) / 2f
+                    canvas.drawBitmap(scaled, x, y, null)
+                    titleRightMargin = 32f + targetW
+                }
+                LogoPosition.LEFT -> {
+                    val x = 24f
+                    val y = (headerHeight - targetH) / 2f
+                    canvas.drawBitmap(scaled, x, y, null)
+                    logoLeftOffset = 32f + targetW
+                }
+                LogoPosition.CENTER -> {
+                    val x = (pageWidth - targetW) / 2f
+                    val y = 10f
+                    canvas.drawBitmap(scaled, x, y, null)
+                }
+            }
+        }
 
         // Title Paint
         val titlePaint = Paint().apply {
@@ -131,7 +173,7 @@ object ReportExporter {
             isAntiAlias = true
             textAlign = Paint.Align.RIGHT
         }
-        canvas.drawText(report.systemName, (pageWidth - 24).toFloat(), 35f, titlePaint)
+        canvas.drawText(report.systemName, (pageWidth - titleRightMargin), 35f, titlePaint)
 
         val subTitlePaint = Paint().apply {
             color = Color.rgb(220, 225, 230)
@@ -139,7 +181,7 @@ object ReportExporter {
             isAntiAlias = true
             textAlign = Paint.Align.RIGHT
         }
-        canvas.drawText(report.title, (pageWidth - 24).toFloat(), 60f, subTitlePaint)
+        canvas.drawText(report.title, (pageWidth - titleRightMargin), 60f, subTitlePaint)
 
         val metaHeaderPaint = Paint().apply {
             color = Color.rgb(180, 195, 210)
@@ -147,28 +189,30 @@ object ReportExporter {
             isAntiAlias = true
             textAlign = Paint.Align.RIGHT
         }
-        canvas.drawText("رقم القضية: ${report.caseNumber}  |  تاريخ الإصدار: ${report.generatedDate}", (pageWidth - 24).toFloat(), 85f, metaHeaderPaint)
+        canvas.drawText("رقم القضية: ${report.caseNumber}  |  تاريخ الإصدار: ${report.generatedDate}", (pageWidth - titleRightMargin), 85f, metaHeaderPaint)
 
-        // Left Logo text
-        val logoPaint = Paint().apply {
-            color = Color.rgb(212, 160, 23)
-            textSize = 14f
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            isAntiAlias = true
-            textAlign = Paint.Align.LEFT
-        }
-        canvas.drawText(report.systemLogoText, 24f, 45f, logoPaint)
+        // Left Logo text (if logo not drawn on left)
+        if (logoBitmap == null || report.logoPosition != LogoPosition.LEFT) {
+            val logoPaint = Paint().apply {
+                color = Color.rgb(212, 160, 23)
+                textSize = 14f
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                isAntiAlias = true
+                textAlign = Paint.Align.LEFT
+            }
+            canvas.drawText(report.systemLogoText, 24f, 45f, logoPaint)
 
-        val logoSubPaint = Paint().apply {
-            color = Color.rgb(170, 185, 200)
-            textSize = 8.5f
-            isAntiAlias = true
-            textAlign = Paint.Align.LEFT
+            val logoSubPaint = Paint().apply {
+                color = Color.rgb(170, 185, 200)
+                textSize = 8.5f
+                isAntiAlias = true
+                textAlign = Paint.Align.LEFT
+            }
+            canvas.drawText("OFFICIAL FORENSIC DOSSIER", 24f, 65f, logoSubPaint)
         }
-        canvas.drawText("OFFICIAL FORENSIC DOSSIER", 24f, 65f, logoSubPaint)
 
         // Content Area setup
-        var currentY = 135f
+        var currentY = 140f
         val bodyLabelPaint = Paint().apply {
             color = Color.rgb(18, 30, 49)
             textSize = 11f
@@ -183,83 +227,154 @@ object ReportExporter {
             textAlign = Paint.Align.RIGHT
         }
 
-        // Section: Case & Subject Details
-        drawSectionHeader(canvas, "1. بيانات القضية والطرف المعني", currentY, pageWidth)
-        currentY += 22f
-
-        canvas.drawText("العميل / الجهة: ${report.clientName} (هاتف: ${report.clientPhone})", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
-        currentY += 16f
-        canvas.drawText("نوع التهديد: ${report.threatType} | درجة الأولوية: ${report.priority} | الحالة: ${report.status}", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
-        currentY += 24f
-
-        // Section: Executive Summary
-        drawSectionHeader(canvas, "2. الملخص التنفيذي لنتائج الفحص", currentY, pageWidth)
-        currentY += 22f
-
-        val summaryLines = wrapText(report.executiveSummary, 90)
-        for (line in summaryLines.take(5)) {
-            canvas.drawText(line, (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
-            currentY += 15f
-        }
-        currentY += 10f
-
-        // Section: Evidence & Hashes
-        drawSectionHeader(canvas, "3. المرفقات والأدلة والبصمات الرقمية (Chain of Custody)", currentY, pageWidth)
-        currentY += 22f
-
-        if (report.evidenceList.isEmpty()) {
-            canvas.drawText("لم يتم تسجيل مرفقات رقمية خارجية مباشرة في هذا التقرير.", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
-            currentY += 18f
-        } else {
-            for ((idx, ev) in report.evidenceList.take(3).withIndex()) {
-                canvas.drawText("[${idx + 1}] ${ev.name} (${ev.fileType}) - الحجم: ${ev.fileSizeFormatted}", (pageWidth - 28).toFloat(), currentY, bodyLabelPaint)
-                currentY += 14f
-                val hashText = "SHA-256: ${if (ev.sha256Hash.isNotBlank()) ev.sha256Hash.take(32) + "..." else "N/A"}"
-                canvas.drawText(hashText, (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
-                currentY += 16f
+        fun checkPageBreak(neededHeight: Float) {
+            if (currentY + neededHeight > pageHeight - 120f) {
+                document.finishPage(page)
+                pageNumber++
+                page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+                canvas = page.canvas
+                // Continuation mini-header
+                canvas.drawRect(0f, 0f, pageWidth.toFloat(), 28f, headerPaint)
+                val contPaint = Paint().apply {
+                    color = Color.rgb(220, 225, 230)
+                    textSize = 9f
+                    isAntiAlias = true
+                    textAlign = Paint.Align.RIGHT
+                }
+                canvas.drawText("تابع التقرير الجنائي: ${report.caseNumber} - صفحة $pageNumber", (pageWidth - 24).toFloat(), 18f, contPaint)
+                currentY = 50f
             }
         }
-        currentY += 8f
 
-        // Section: Technical Findings & Outcome
-        drawSectionHeader(canvas, "4. التحليل التقني والنتيجة الفنية", currentY, pageWidth)
-        currentY += 22f
+        // Render Ordered Visible Sections
+        var sectionNum = 1
+        for (section in report.visibleSections) {
+            when (section) {
+                ReportSection.CASE_DETAILS -> {
+                    checkPageBreak(70f)
+                    drawSectionHeader(canvas, "$sectionNum. بيانات القضية والطرف المعني", currentY, pageWidth)
+                    currentY += 22f
+                    canvas.drawText("العميل / الجهة: ${report.clientName} (هاتف: ${report.clientPhone})", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
+                    currentY += 16f
+                    canvas.drawText("نوع التهديد: ${report.threatType} | درجة الأولوية: ${report.priority} | الحالة: ${report.status}", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
+                    currentY += 24f
+                    sectionNum++
+                }
 
-        val outcomeLines = wrapText(report.finalOutcome.ifBlank { "اكتمل الفحص الفني واستخلاص القرائن الرقمية بنجاح." }, 90)
-        for (line in outcomeLines.take(4)) {
-            canvas.drawText(line, (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
-            currentY += 15f
+                ReportSection.EXECUTIVE_SUMMARY -> {
+                    val summaryLines = wrapText(report.executiveSummary, 90)
+                    checkPageBreak(35f + (summaryLines.size * 15f))
+                    drawSectionHeader(canvas, "$sectionNum. المقدمة والملخص التنفيذي", currentY, pageWidth)
+                    currentY += 22f
+                    for (line in summaryLines.take(6)) {
+                        canvas.drawText(line, (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
+                        currentY += 15f
+                    }
+                    currentY += 10f
+                    sectionNum++
+                }
+
+                ReportSection.TECHNICAL_ANALYSIS -> {
+                    val techContent = report.technicalAnalysis.ifBlank { report.finalOutcome }
+                    val contentLines = wrapText(techContent, 90)
+                    checkPageBreak(35f + (contentLines.size * 15f))
+                    drawSectionHeader(canvas, "$sectionNum. المحتوى والتحليل الفني الجنائي", currentY, pageWidth)
+                    currentY += 22f
+                    for (line in contentLines.take(6)) {
+                        canvas.drawText(line, (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
+                        currentY += 15f
+                    }
+                    currentY += 10f
+                    sectionNum++
+                }
+
+                ReportSection.EVIDENCE_LEDGER -> {
+                    checkPageBreak(60f)
+                    drawSectionHeader(canvas, "$sectionNum. سجل الأدلة والمرفقات والبصمات الرقمية", currentY, pageWidth)
+                    currentY += 22f
+                    if (report.evidenceList.isEmpty()) {
+                        canvas.drawText("لم يتم تسجيل مرفقات رقمية خارجية مباشرة في هذا التقرير.", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
+                        currentY += 18f
+                    } else {
+                        for ((idx, ev) in report.evidenceList.take(3).withIndex()) {
+                            checkPageBreak(32f)
+                            canvas.drawText("[${idx + 1}] ${ev.name} (${ev.fileType}) - الحجم: ${ev.fileSizeFormatted}", (pageWidth - 28).toFloat(), currentY, bodyLabelPaint)
+                            currentY += 14f
+                            val hashText = "SHA-256: ${if (ev.sha256Hash.isNotBlank()) ev.sha256Hash.take(32) + "..." else "N/A"}"
+                            canvas.drawText(hashText, (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
+                            currentY += 16f
+                        }
+                    }
+                    currentY += 8f
+                    sectionNum++
+                }
+
+                ReportSection.CUSTOM_NOTES -> {
+                    if (report.customNotesList.isNotEmpty()) {
+                        checkPageBreak(40f + (report.customNotesList.size * 16f))
+                        drawSectionHeader(canvas, "$sectionNum. ملاحظات وتوجيهات خاصة", currentY, pageWidth)
+                        currentY += 22f
+                        for ((nIdx, note) in report.customNotesList.withIndex()) {
+                            val noteLines = wrapText(note, 90)
+                            for (nLine in noteLines) {
+                                canvas.drawText("• $nLine", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
+                                currentY += 15f
+                            }
+                        }
+                        currentY += 10f
+                        sectionNum++
+                    }
+                }
+
+                ReportSection.RECOMMENDATIONS -> {
+                    checkPageBreak(65f)
+                    drawSectionHeader(canvas, "$sectionNum. التوصيات والإجراءات الفنية الموصى بها", currentY, pageWidth)
+                    currentY += 22f
+                    val recs = if (report.securityRecommendations.isNotEmpty()) report.securityRecommendations else listOf(
+                        "تفعيل المصادقة الثنائية (2FA) عبر تطبيقات توليد الرموز لجميع الحسابات الحيوية.",
+                        "عزل الأجهزة المشتبه بإصابتها عن الشبكات المحلية وإجراء فحص بذاكرة التخزين الحي.",
+                        "الاحتفاظ بنسخ احتياطية غير متصلة بالإنترنت (Cold Backups) للبيانات الحساسة."
+                    )
+                    for ((idx, rec) in recs.take(3).withIndex()) {
+                        canvas.drawText("• (${idx + 1}) $rec", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
+                        currentY += 16f
+                    }
+                    currentY += 12f
+                    sectionNum++
+                }
+
+                ReportSection.FINANCIAL_SUMMARY -> {
+                    if (report.paymentsSummary != null) {
+                        checkPageBreak(50f)
+                        drawSectionHeader(canvas, "$sectionNum. الملخص المالي والمستحقات", currentY, pageWidth)
+                        currentY += 22f
+                        val p = report.paymentsSummary
+                        canvas.drawText("إجمالي الأتعاب: ${p.totalAmount} ${p.currency} | المسدد: ${p.paidAmount} ${p.currency} | المتبقي: ${p.remainingAmount} ${p.currency}", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
+                        currentY += 20f
+                        sectionNum++
+                    }
+                }
+
+                ReportSection.SIGNATURE -> {
+                    // Handled at the bottom stamp
+                }
+            }
         }
-        currentY += 10f
-
-        // Section: Recommendations
-        drawSectionHeader(canvas, "5. التوصيات والإجراءات الفنية الموصى بها", currentY, pageWidth)
-        currentY += 22f
-
-        val recs = if (report.securityRecommendations.isNotEmpty()) report.securityRecommendations else listOf(
-            "تفعيل المصادقة الثنائية (2FA) عبر تطبيقات توليد الرموز لجميع الحسابات الحيوية.",
-            "عزل الأجهزة المشتبه بإصابتها عن الشبكات المحلية وإجراء فحص بذاكرة التخزين الحي.",
-            "الاحتفاظ بنسخ احتياطية غير متصلة بالإنترنت (Cold Backups) للبيانات الحساسة."
-        )
-        for ((idx, rec) in recs.take(3).withIndex()) {
-            canvas.drawText("• (${idx + 1}) $rec", (pageWidth - 28).toFloat(), currentY, bodyTextPaint)
-            currentY += 16f
-        }
-        currentY += 15f
 
         // Official Stamp & Verification Footer
+        checkPageBreak(115f)
         val stampBoxPaint = Paint().apply {
             color = Color.rgb(245, 247, 250)
             style = Paint.Style.FILL
         }
-        canvas.drawRoundRect(24f, pageHeight - 115f, (pageWidth - 24).toFloat(), pageHeight - 30f, 8f, 8f, stampBoxPaint)
+        canvas.drawRoundRect(24f, pageHeight - 118f, (pageWidth - 24).toFloat(), pageHeight - 25f, 8f, 8f, stampBoxPaint)
 
         val stampBorderPaint = Paint().apply {
             color = Color.rgb(212, 160, 23)
             style = Paint.Style.STROKE
             strokeWidth = 1.2f
         }
-        canvas.drawRoundRect(24f, pageHeight - 115f, (pageWidth - 24).toFloat(), pageHeight - 30f, 8f, 8f, stampBorderPaint)
+        canvas.drawRoundRect(24f, pageHeight - 118f, (pageWidth - 24).toFloat(), pageHeight - 25f, 8f, 8f, stampBorderPaint)
 
         val stampTextPaint = Paint().apply {
             color = Color.rgb(18, 30, 49)
@@ -268,7 +383,7 @@ object ReportExporter {
             isAntiAlias = true
             textAlign = Paint.Align.RIGHT
         }
-        canvas.drawText("المحقق المعتمد: ${report.investigatorName} - ${report.investigatorTitle}", (pageWidth - 36).toFloat(), pageHeight - 95f, stampTextPaint)
+        canvas.drawText("المحقق المعتمد: ${report.investigatorName} - ${report.investigatorTitle}", (pageWidth - 36).toFloat(), pageHeight - 98f, stampTextPaint)
 
         val stampSubPaint = Paint().apply {
             color = Color.rgb(90, 100, 115)
@@ -276,7 +391,15 @@ object ReportExporter {
             isAntiAlias = true
             textAlign = Paint.Align.RIGHT
         }
-        canvas.drawText("تواصل: ${report.contactPhone} | ${report.contactEmail}", (pageWidth - 36).toFloat(), pageHeight - 78f, stampSubPaint)
+        canvas.drawText("تواصل: ${report.contactPhone} | ${report.contactEmail}", (pageWidth - 36).toFloat(), pageHeight - 82f, stampSubPaint)
+
+        val conclusionPaint = Paint().apply {
+            color = Color.rgb(40, 50, 65)
+            textSize = 8f
+            isAntiAlias = true
+            textAlign = Paint.Align.RIGHT
+        }
+        canvas.drawText(report.customConclusion, (pageWidth - 36).toFloat(), pageHeight - 66f, conclusionPaint)
 
         val verificationHash = if (report.digitalVerificationHash.isNotBlank()) report.digitalVerificationHash else generateVerificationHash(report)
         val hashPaint = Paint().apply {
@@ -286,7 +409,7 @@ object ReportExporter {
             isAntiAlias = true
             textAlign = Paint.Align.RIGHT
         }
-        canvas.drawText("بصمة التحقق المشفرة: $verificationHash", (pageWidth - 36).toFloat(), pageHeight - 55f, hashPaint)
+        canvas.drawText("بصمة التحقق المشفرة: $verificationHash", (pageWidth - 36).toFloat(), pageHeight - 48f, hashPaint)
 
         // Stamp badge on left
         val badgePaint = Paint().apply {
@@ -295,7 +418,7 @@ object ReportExporter {
             typeface = Typeface.create(Typeface.DEFAULT_BOLD, Typeface.BOLD)
             textAlign = Paint.Align.LEFT
         }
-        canvas.drawText("[VERIFIED DOSSIER]", 36f, pageHeight - 80f, badgePaint)
+        canvas.drawText("[VERIFIED DOSSIER]", 36f, pageHeight - 75f, badgePaint)
 
         document.finishPage(page)
         FileOutputStream(outputFile).use { out ->
