@@ -5,7 +5,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Clean Minimalist Deep Midnight Canvas -->
+
+    <!-- Dark Obsidian & Deep Cobalt Base Canvas -->
     <path
         android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
@@ -15,16 +16,81 @@
                 android:endX="108"
                 android:endY="108"
                 android:type="linear">
-                <item android:color="#FF0A0A12" android:offset="0.0" />
-                <item android:color="#FF100E20" android:offset="0.5" />
-                <item android:color="#FF181534" android:offset="1.0" />
+                <item android:color="#FF070A12" android:offset="0.0" />
+                <item android:color="#FF0B1120" android:offset="0.5" />
+                <item android:color="#FF04060A" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- Subtle ambient frame circle around safe zone -->
-    <path
-        android:pathData="M54,21 A33,33 0 1,1 53.9,21 Z"
-        android:strokeColor="#18818CF8"
-        android:strokeWidth="0.8" />
-</vector>
 
+    <!-- Ambient Center Cobalt/Cyan Radial Glow -->
+    <path
+        android:pathData="M54,20 A34,34 0 1,1 53.9,20 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="30"
+                android:endX="54"
+                android:endY="80"
+                android:type="linear">
+                <item android:color="#2800F0FF" android:offset="0.0" />
+                <item android:color="#1A1E40AF" android:offset="0.6" />
+                <item android:color="#00000000" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- High-Tech Squircle Accent Frame (Within Safe Margin) -->
+    <path
+        android:pathData="M34,22 L74,22 C84,22 86,24 86,34 L86,74 C86,84 84,86 74,86 L34,86 C24,86 22,84 22,74 L22,34 C22,24 24,22 34,22 Z"
+        android:strokeWidth="1.2">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="22"
+                android:startY="22"
+                android:endX="86"
+                android:endY="86"
+                android:type="linear">
+                <item android:color="#4000F0FF" android:offset="0.0" />
+                <item android:color="#151E3A8A" android:offset="0.5" />
+                <item android:color="#3500F0FF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Circuit Trace Lines & Micro-Nodes -->
+    <!-- Top-Right Trace -->
+    <path
+        android:pathData="M70,22 L77,15 L92,15"
+        android:strokeColor="#2500F0FF"
+        android:strokeWidth="1.0"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M92,15 A1.5,1.5 0 1,1 91.9,15 Z"
+        android:fillColor="#4000F0FF" />
+
+    <!-- Bottom-Left Trace -->
+    <path
+        android:pathData="M38,86 L31,93 L16,93"
+        android:strokeColor="#2500F0FF"
+        android:strokeWidth="1.0"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M16,93 A1.5,1.5 0 1,1 15.9,93 Z"
+        android:fillColor="#4000F0FF" />
+
+    <!-- Top-Left Corner Notch -->
+    <path
+        android:pathData="M22,36 L16,36 L16,48"
+        android:strokeColor="#2000E5FF"
+        android:strokeWidth="1.0"
+        android:strokeLineCap="round" />
+
+    <!-- Bottom-Right Corner Notch -->
+    <path
+        android:pathData="M86,72 L92,72 L92,60"
+        android:strokeColor="#2000E5FF"
+        android:strokeWidth="1.0"
+        android:strokeLineCap="round" />
+
+</vector>

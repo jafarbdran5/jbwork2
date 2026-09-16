@@ -36,7 +36,10 @@ data class CaseEntity(
     // Official & External Identifiers
     val externalPlatformCaseId: String = "", // رقم أو معرف البلاغ بالمنصة الخارجية (Meta, Google, X, إلخ)
     val supportTicketId: String = "", // رقم تذكرة الدعم الفني
-    val targetIdentifier: String = "" // معرف الحساب أو الرابط المستهدف
+    val targetIdentifier: String = "", // معرف الحساب أو الرابط المستهدف
+    val internalCaseEmail: String = "", // البريد الداخلي للقضية
+    val customLinksJson: String = "[]", // روابط ومجموعات الروابط
+    val customIdentifiersJson: String = "[]" // المعرفات المنظمة
 )
 
 @Entity(tableName = "clients")
@@ -322,6 +325,7 @@ data class CaseCustomLinkEntity(
     val title: String,
     val url: String,
     val linkType: String = "رابط خارجي", // حساب, صفحة, منشور, فيديو, صورة, مجموعة, قناة, موقع, رابط دعم, رابط بلاغ, رابط تذكرة, رابط مراسلة, رابط Google Sheet, رابط خارجي, أخرى
+    val groupName: String = "", // اسم المجموعة إن وجد (مثل: حسابات العميل)
     val notes: String = "",
     val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis()

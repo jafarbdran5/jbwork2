@@ -7,107 +7,259 @@
     android:viewportHeight="108">
 
     <!-- ======================================================== -->
-    <!-- Modern Minimalist Typographic Monogram: JB              -->
+    <!-- High-Tech Cyber Security Shield & "JB" Monogram Emblem    -->
     <!-- Strictly within 66dp Safe Zone (Center: 54, 54)          -->
     <!-- ======================================================== -->
 
-    <!-- LETTER B (Vibrant Indigo Gradient) -->
-    <!-- B Vertical Spine -->
+    <!-- Outer Ambient Shield Glow -->
     <path
-        android:pathData="M55,34 L55,74"
-        android:strokeWidth="5.6"
+        android:pathData="M54,23 L76,28 L76,54 C76,69 66,80 54,84 C42,80 32,69 32,54 L32,28 Z"
+        android:strokeWidth="4.5"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="32"
+                android:startY="23"
+                android:endX="76"
+                android:endY="84"
+                android:type="linear">
+                <item android:color="#3500F0FF" android:offset="0.0" />
+                <item android:color="#201D4ED8" android:offset="0.6" />
+                <item android:color="#00000000" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Solid Obsidian Cyber Shield Plate -->
+    <path
+        android:pathData="M54,25 L74,30 L74,54 C74,67 65,77 54,82 C43,77 34,67 34,54 L34,30 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="25"
+                android:endX="54"
+                android:endY="82"
+                android:type="linear">
+                <item android:color="#F50C1322" android:offset="0.0" />
+                <item android:color="#FA080C17" android:offset="0.6" />
+                <item android:color="#FF04060B" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner Futuristic Shield Inset Frame -->
+    <path
+        android:pathData="M54,29 L70,33 L70,53 C70,63 63,72 54,77 C45,72 38,63 38,53 L38,33 Z"
+        android:strokeColor="#2500F0FF"
+        android:strokeWidth="1.2"
+        android:strokeLineJoin="round" />
+
+    <!-- Outer Cyber Shield Contour & Metallic Bevel -->
+    <path
+        android:pathData="M54,25 L74,30 L74,54 C74,67 65,77 54,82 C43,77 34,67 34,54 L34,30 Z"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="34"
+                android:startY="25"
+                android:endX="74"
+                android:endY="82"
+                android:type="linear">
+                <item android:color="#FFA5F3FC" android:offset="0.0" />
+                <item android:color="#FF00F0FF" android:offset="0.25" />
+                <item android:color="#FF2563EB" android:offset="0.75" />
+                <item android:color="#FF1E3A8A" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Diagonal Metallic Light Reflection Across Shield -->
+    <path
+        android:pathData="M40,30 L64,27 L48,78 L36,70 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="40"
+                android:startY="30"
+                android:endX="64"
+                android:endY="78"
+                android:type="linear">
+                <item android:color="#1AFFFFFF" android:offset="0.0" />
+                <item android:color="#0D00F0FF" android:offset="0.5" />
+                <item android:color="#00000000" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Shield Apex Cyber Nexus Node -->
+    <path
+        android:pathData="M54,23 L56,25 L54,27 L52,25 Z"
+        android:fillColor="#FF00F0FF" />
+
+    <!-- Side Flank Circuit Accents -->
+    <path
+        android:pathData="M30,46 L34,46"
+        android:strokeColor="#FF00F0FF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M74,46 L78,46"
+        android:strokeColor="#FF00F0FF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round" />
+
+    <!-- ======================================================== -->
+    <!-- Centered "JB" Monogram Typographic Core                 -->
+    <!-- ======================================================== -->
+
+    <!-- Connecting Cyber Crossbar between J and B (Middle Nexus) -->
+    <path
+        android:pathData="M45,53 L54,53"
+        android:strokeWidth="4.6"
         android:strokeLineCap="round">
         <aapt:attr name="android:strokeColor">
             <gradient
-                android:startX="55"
-                android:startY="34"
-                android:endX="77"
-                android:endY="74"
+                android:startX="45"
+                android:startY="53"
+                android:endX="54"
+                android:endY="53"
                 android:type="linear">
-                <item android:color="#FFA5B4FC" android:offset="0.0" />
-                <item android:color="#FF818CF8" android:offset="0.5" />
-                <item android:color="#FF6366F1" android:offset="1.0" />
+                <item android:color="#FF00F0FF" android:offset="0.0" />
+                <item android:color="#FF38BDF8" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Top Connecting Header Accent -->
+    <path
+        android:pathData="M48,39 L54,39"
+        android:strokeColor="#AA00F0FF"
+        android:strokeWidth="2.0"
+        android:strokeLineCap="round" />
+
+    <!-- LETTER B (Electric Cyan to Deep Cobalt Blue) -->
+    <!-- B Vertical Spine -->
+    <path
+        android:pathData="M54,39 L54,67"
+        android:strokeWidth="4.8"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="54"
+                android:startY="39"
+                android:endX="54"
+                android:endY="67"
+                android:type="linear">
+                <item android:color="#FF00F0FF" android:offset="0.0" />
+                <item android:color="#FF38BDF8" android:offset="0.4" />
+                <item android:color="#FF2563EB" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
     <!-- B Upper Bowl -->
     <path
-        android:pathData="M55,34 L65,34 C74,34 74,54 65,54 L55,54"
-        android:strokeWidth="5.6"
+        android:pathData="M54,39 L63,39 C68,39 68,53 63,53 L54,53"
+        android:strokeWidth="4.8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round">
         <aapt:attr name="android:strokeColor">
             <gradient
-                android:startX="55"
-                android:startY="34"
-                android:endX="74"
-                android:endY="54"
+                android:startX="54"
+                android:startY="39"
+                android:endX="68"
+                android:endY="53"
                 android:type="linear">
-                <item android:color="#FFA5B4FC" android:offset="0.0" />
-                <item android:color="#FF818CF8" android:offset="1.0" />
+                <item android:color="#FFA5F3FC" android:offset="0.0" />
+                <item android:color="#FF00F0FF" android:offset="0.6" />
+                <item android:color="#FF38BDF8" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
     <!-- B Lower Bowl -->
     <path
-        android:pathData="M55,54 L67,54 C77,54 77,74 67,74 L55,74"
-        android:strokeWidth="5.6"
+        android:pathData="M54,53 L64,53 C70,53 70,67 64,67 L54,67"
+        android:strokeWidth="4.8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round">
         <aapt:attr name="android:strokeColor">
             <gradient
-                android:startX="55"
-                android:startY="54"
-                android:endX="77"
-                android:endY="74"
+                android:startX="54"
+                android:startY="53"
+                android:endX="70"
+                android:endY="67"
                 android:type="linear">
-                <item android:color="#FF818CF8" android:offset="0.0" />
-                <item android:color="#FF6366F1" android:offset="1.0" />
+                <item android:color="#FF38BDF8" android:offset="0.0" />
+                <item android:color="#FF2563EB" android:offset="0.6" />
+                <item android:color="#FF1D4ED8" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Middle Intertwining Bridge from B into J -->
+    <!-- LETTER J (Brilliant High-Contrast White into Electric Cyan) -->
+    <!-- J Top Horizontal Bar -->
     <path
-        android:pathData="M55,54 L43,54"
-        android:strokeWidth="5.6"
+        android:pathData="M38,39 L49,39"
+        android:strokeWidth="4.8"
         android:strokeLineCap="round">
         <aapt:attr name="android:strokeColor">
             <gradient
-                android:startX="55"
-                android:startY="54"
-                android:endX="43"
-                android:endY="54"
+                android:startX="38"
+                android:startY="39"
+                android:endX="49"
+                android:endY="39"
                 android:type="linear">
-                <item android:color="#FF818CF8" android:offset="0.0" />
-                <item android:color="#FFA5B4FC" android:offset="1.0" />
+                <item android:color="#FFFFFFFF" android:offset="0.0" />
+                <item android:color="#FFE0F2FE" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- LETTER J (High-Contrast Brilliant White) -->
-    <!-- Top Bar of J Connecting with B at Cap-Height -->
-    <path
-        android:pathData="M35,34 L55,34"
-        android:strokeWidth="5.6"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round" />
-
     <!-- J Vertical Stem -->
     <path
-        android:pathData="M43,34 L43,63"
-        android:strokeWidth="5.6"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round" />
+        android:pathData="M45,39 L45,61"
+        android:strokeWidth="4.8"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="45"
+                android:startY="39"
+                android:endX="45"
+                android:endY="61"
+                android:type="linear">
+                <item android:color="#FFFFFFFF" android:offset="0.0" />
+                <item android:color="#FFE0F2FE" android:offset="0.4" />
+                <item android:color="#FF38BDF8" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
     <!-- J Bottom Hook -->
     <path
-        android:pathData="M43,63 C43,74 31,74 31,65"
-        android:strokeWidth="5.6"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round" />
+        android:pathData="M45,61 C45,68 37,68 37,62"
+        android:strokeWidth="4.8"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="45"
+                android:startY="61"
+                android:endX="37"
+                android:endY="68"
+                android:type="linear">
+                <item android:color="#FF38BDF8" android:offset="0.0" />
+                <item android:color="#FF00F0FF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Micro Tech Node Accents at Monogram Terminals -->
+    <path
+        android:pathData="M37,62 A1.2,1.2 0 1,1 36.9,62 Z"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M54,82 A1.5,1.5 0 1,1 53.9,82 Z"
+        android:fillColor="#FF00F0FF" />
 
 </vector>
-

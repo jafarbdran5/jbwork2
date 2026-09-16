@@ -106,7 +106,7 @@ import kotlinx.coroutines.launch
         GeneratedReportEntity::class,
         ReportTemplateEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -331,6 +331,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE `cases` ADD COLUMN `internalCaseEmail` TEXT NOT NULL DEFAULT ''")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE `cases` ADD COLUMN `customLinksJson` TEXT NOT NULL DEFAULT '[]'")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE `cases` ADD COLUMN `customIdentifiersJson` TEXT NOT NULL DEFAULT '[]'")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE `case_custom_links` ADD COLUMN `groupName` TEXT NOT NULL DEFAULT ''")
+                } catch (_: Exception) {}
+            }
+        }
+
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -338,7 +355,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "jaffar_forensics.db"
                 )
-                .addMigrations(MIGRATION_4_5, MIGRATION_6_7, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_12_13)
+                .addMigrations(MIGRATION_4_5, MIGRATION_6_7, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_12_13, MIGRATION_13_14)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

@@ -72,6 +72,16 @@ class ForensicRepository(
     private val officialSourceDao = database.officialSourceDao()
     private val profitShareRuleDao = database.profitShareRuleDao()
     private val financialRevenueDao = database.financialRevenueDao()
+    private val caseCustomLinkDao = database.caseCustomLinkDao()
+
+    fun getLinksForCase(caseId: String): Flow<List<com.example.data.local.entities.CaseCustomLinkEntity>> = caseCustomLinkDao.getLinksForCase(caseId)
+
+    suspend fun saveCustomLinksForCase(caseId: String, links: List<com.example.data.local.entities.CaseCustomLinkEntity>) {
+        caseCustomLinkDao.deleteByCaseId(caseId)
+        if (links.isNotEmpty()) {
+            caseCustomLinkDao.insertAll(links)
+        }
+    }
 
     // Sync status state for UI feedback
     private val _isCloudSyncing = MutableStateFlow(false)

@@ -1890,6 +1890,129 @@ $sectionNumber التوصية الفنية والإجرائية:
         }
     }
 
+    fun getLinksForCase(caseId: String): kotlinx.coroutines.flow.Flow<List<com.example.data.local.entities.CaseCustomLinkEntity>> {
+        return repository.getLinksForCase(caseId)
+    }
+
+    fun saveCaseWithFullMetadata(
+        caseEntity: CaseEntity,
+        draftImages: List<com.example.ui.screens.cases.creation.DraftCaseImage>,
+        customLinks: List<com.example.ui.screens.cases.creation.DraftCustomLink>,
+        customIdentifiers: List<com.example.ui.screens.cases.creation.DraftIdentifier>,
+        internalCaseEmail: String,
+        isNew: Boolean,
+        context: Context,
+        onSuccess: (CaseEntity) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val linksJson = com.example.ui.screens.cases.creation.DraftCustomLink.listToJsonString(customLinks)
+                val idsJson = com.example.ui.screens.cases.creation.DraftIdentifier.listToJsonString(customIdentifiers)
+
+                val updatedCase = caseEntity.copy(
+                    internalCaseEmail = internalCaseEmail.trim(),
+                    customLinksJson = linksJson,
+                    customIdentifiersJson = idsJson,
+                    updatedDate = System.currentTimeMillis()
+                )
+
+                // 1. Insert or update case entity
+                repository.insertOrUpdateCase(updatedCase, isNew = isNew)
+
+                // 2. Persist custom links in relational table
+                val linkEntities = customLinks.mapIndexed { idx, link ->
+                    com.example.data.local.entities.CaseCustomLinkEntity(
+                        id = link.id,
+                        caseId = updatedCase.id,
+                        caseNumber = updatedCase.caseNumber,
+                        title = link.title,
+                        url = link.url,
+                        linkType = link.linkType,
+                        groupName = link.groupName,
+                        notes = if (link.groupName.isNotBlank()) "مجموعة: ${link.groupName}" else "",
+                        sortOrder = idx,
+                        createdAt = System.currentTimeMillis()
+                    )
+                }
+                repository.saveCustomLinksForCase(updatedCase.id, linkEntities)
+
+                // 3. Process and persist draft images to permanent case storage
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val caseDir = java.io.File(context.filesDir, "cases/${updatedCase.id}")
+                    if (!caseDir.exists()) caseDir.mkdirs()
+
+                    draftImages.forEach { draftImg ->
+                        try {
+                            val safeName = draftImg.displayName.replace(Regex("[^a-zA-Z0-9._\\-\\u0600-\\u06FF]"), "_")
+                            val targetFile = java.io.File(caseDir, safeName)
+
+                            // Copy from draft cache to permanent case storage
+                            draftImg.localFile.inputStream().use { input ->
+                                targetFile.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+
+                            // Compute MD5 & SHA-256
+                            val md5Digest = java.security.MessageDigest.getInstance("MD5")
+                            val sha256Digest = java.security.MessageDigest.getInstance("SHA-256")
+                            targetFile.inputStream().use { input ->
+                                val buffer = ByteArray(8192)
+                                var bytesRead: Int
+                                while (input.read(buffer).also { bytesRead = it } != -1) {
+                                    md5Digest.update(buffer, 0, bytesRead)
+                                    sha256Digest.update(buffer, 0, bytesRead)
+                                }
+                            }
+                            val md5Hex = md5Digest.digest().joinToString("") { "%02x".format(it) }
+                            val sha256Hex = sha256Digest.digest().joinToString("") { "%02x".format(it) }
+
+                            val evidence = EvidenceEntity(
+                                id = "evi_${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().take(6)}",
+                                caseId = updatedCase.id,
+                                caseNumber = updatedCase.caseNumber,
+                                evidenceName = safeName,
+                                fileType = "صورة رقمية",
+                                originalFilename = draftImg.originalFileName,
+                                md5Hash = md5Hex,
+                                sha256Hash = sha256Hex,
+                                exifDeviceModel = "حفظ محلي مشفر",
+                                exifSoftware = "Jaffar Forensic Core",
+                                exifGpsCoords = "تخزين محلي بدون إنترنت",
+                                exifTimestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()),
+                                chainOfCustodyLog = "تم الفحص والتوثيق محلياً أثناء إنشاء القضية بواسطة ${_currentRole.value}",
+                                notes = "تم إرفاقها وتوثيقها أثناء إنشاء القضية وحساب البصمة الرقمية فوراً.",
+                                localFilePath = targetFile.absolutePath,
+                                fileSizeBytes = targetFile.length(),
+                                fileSizeFormatted = draftImg.fileSizeFormatted,
+                                mimeType = draftImg.mimeType,
+                                category = "صور",
+                                description = "صورة مرفقة أثناء إنشاء القضية"
+                            )
+                            repository.insertOrUpdateEvidence(evidence, isNew = true)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+
+                // 4. Audit log
+                repository.logAudit(
+                    actionType = if (isNew) "CREATE" else "UPDATE",
+                    module = "CASES",
+                    entityId = updatedCase.id,
+                    performedBy = _currentRole.value,
+                    details = "تم ${if (isNew) "إنشاء" else "تحديث"} القضية رقم (${updatedCase.caseNumber}) مع ${draftImages.size} صور و ${customLinks.size} روابط و ${customIdentifiers.size} معرفات."
+                )
+
+                showHud("تم ${if (isNew) "إنشاء" else "تحديث"} القضية (${updatedCase.caseNumber}) بنجاح", HudType.SUCCESS)
+                onSuccess(updatedCase)
+            } catch (e: Exception) {
+                showHud("خطأ في حفظ القضية: ${e.localizedMessage}", HudType.ERROR)
+            }
+        }
+    }
+
     // ==========================================
     // ADMIN MODE: FULL SYSTEM CONTROL METHODS
     // ==========================================

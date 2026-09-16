@@ -37,6 +37,7 @@ val CyberTertiary = Color(0xFF0891B2)
 val CyberSuccess = Color(0xFF10B981)
 val CyberWarning = Color(0xFFF59E0B)
 val CyberDanger = Color(0xFFEF4444)
+val CyberError = CyberDanger
 val CyberInfo = Color(0xFF3B82F6)
 
 // Dynamic Theme-Aware Getters for Compose
