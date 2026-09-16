@@ -123,6 +123,7 @@ import com.example.ui.screens.trash.TrashScreen
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.ui.navigation.ScreenDestination
 import com.example.ui.screens.settings.BottomBarSettingsScreen
+import com.example.ui.screens.settings.LockScreenCustomizationScreen
 import com.example.ui.theme.CyberBorder
 import com.example.ui.theme.CyberDanger
 import com.example.ui.theme.CyberPrimary
@@ -194,10 +195,12 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
                     val bottomBarSettings by viewModel.bottomBarSettings.collectAsStateWithLifecycle()
                     val visibleBottomItems by viewModel.visibleBottomBarItems.collectAsStateWithLifecycle()
+                    val lockScreenTexts by viewModel.lockScreenTexts.collectAsStateWithLifecycle()
 
                     var currentScreen by remember { mutableIntStateOf(ScreenDestination.DASHBOARD.id) }
                     var hasAppliedDefaultScreen by remember { mutableStateOf(false) }
                     var isBottomBarSettingsOpen by remember { mutableStateOf(false) }
+                    var isLockScreenCustomizationOpen by remember { mutableStateOf(false) }
 
                     LaunchedEffect(bottomBarSettings.defaultDestinationId) {
                         if (!hasAppliedDefaultScreen) {
@@ -346,6 +349,11 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                 BottomBarSettingsScreen(
                                     viewModel = viewModel,
                                     onNavigateBack = { isBottomBarSettingsOpen = false }
+                                )
+                            } else if (isLockScreenCustomizationOpen) {
+                                LockScreenCustomizationScreen(
+                                    viewModel = viewModel,
+                                    onNavigateBack = { isLockScreenCustomizationOpen = false }
                                 )
                             } else {
                                 Scaffold(
@@ -543,9 +551,13 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                             viewModel = viewModel,
                                             onNavigateToTrash = { currentScreen = ScreenDestination.TRASH.id },
                                             onNavigateToAdmin = { currentScreen = ScreenDestination.ADMIN_MANAGEMENT.id },
-                                            onNavigateToBottomBarSettings = { isBottomBarSettingsOpen = true }
+                                            onNavigateToBottomBarSettings = { isBottomBarSettingsOpen = true },
+                                            onNavigateToLockScreenCustomization = { isLockScreenCustomizationOpen = true }
                                         )
-                                        ScreenDestination.SECURITY.id -> AuditAndSecurityScreen(viewModel = viewModel)
+                                        ScreenDestination.SECURITY.id -> AuditAndSecurityScreen(
+                                            viewModel = viewModel,
+                                            onNavigateToLockScreenCustomization = { isLockScreenCustomizationOpen = true }
+                                        )
                                         ScreenDestination.ADMIN_MANAGEMENT.id -> AdminDashboardScreen(
                                             viewModel = viewModel,
                                             onNavigateBack = { currentScreen = ScreenDestination.SETTINGS.id }
@@ -585,7 +597,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                                 onError = { err -> viewModel.showHud(err, HudType.WARNING) }
                                             )
                                         },
-                                        isBiometricAvailable = isBioHardwareAvailable
+                                        isBiometricAvailable = isBioHardwareAvailable,
+                                        customTexts = lockScreenTexts
                                     )
                                 }
                             }

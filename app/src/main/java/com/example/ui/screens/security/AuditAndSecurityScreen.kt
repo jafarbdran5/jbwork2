@@ -36,16 +36,18 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SupervisorAccount
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import com.example.ui.screens.settings.LockScreenCustomizationScreen
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -112,7 +114,8 @@ val EMERGENCY_HOTLINES = listOf(
 @Composable
 fun AuditAndSecurityScreen(
     viewModel: ForensicViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToLockScreenCustomization: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val auditLogs by viewModel.auditLogs.collectAsStateWithLifecycle()
@@ -128,6 +131,7 @@ fun AuditAndSecurityScreen(
     val isBiometricHardwareEnabled by viewModel.isBiometricHardwareEnabled.collectAsStateWithLifecycle()
 
     var showChangePinDialog by remember { mutableStateOf(false) }
+    var showLockCustomizationModal by remember { mutableStateOf(false) }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("مركز التحكم والأمان", "سجل التدقيق الأمني (Audit Log)", "أرقام الطوارئ والمصادر")
@@ -372,6 +376,27 @@ fun AuditAndSecurityScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("قفل المنظومة فوراً", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Customize Password Screen Button
+                                OutlinedButton(
+                                    onClick = {
+                                        if (onNavigateToLockScreenCustomization != null) {
+                                            onNavigateToLockScreenCustomization()
+                                        } else {
+                                            showLockCustomizationModal = true
+                                        }
+                                    },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberPrimaryLight),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.35f)),
+                                    modifier = Modifier.fillMaxWidth().testTag("open_lock_screen_customization_btn")
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("تخصيص شاشة كلمة المرور", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
                             }
                         }
                     }
@@ -559,6 +584,18 @@ fun AuditAndSecurityScreen(
                 success
             }
         )
+    }
+
+    if (showLockCustomizationModal) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showLockCustomizationModal = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            LockScreenCustomizationScreen(
+                viewModel = viewModel,
+                onNavigateBack = { showLockCustomizationModal = false }
+            )
+        }
     }
 }
 

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.preferences.LockScreenCustomTexts
 import com.example.ui.theme.CyberCardElevated
 import com.example.ui.theme.CyberDanger
 import com.example.ui.theme.CyberPrimary
@@ -68,16 +70,20 @@ import kotlin.math.roundToInt
 fun BiometricLockScreen(
     onVerifyPin: (String) -> Boolean,
     onTriggerBiometric: () -> Unit,
-    isBiometricAvailable: Boolean = true
+    isBiometricAvailable: Boolean = true,
+    customTexts: LockScreenCustomTexts = LockScreenCustomTexts(),
+    isPreview: Boolean = false
 ) {
     var enteredPin by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
+    var isSuccess by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
     val shakeOffset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
 
     fun handleDigit(digit: String) {
+        if (isSuccess) return
         if (enteredPin.length < 4) {
             val newPin = enteredPin + digit
             enteredPin = newPin
@@ -85,19 +91,48 @@ fun BiometricLockScreen(
             errorMessage = ""
 
             if (newPin.length == 4) {
-                val success = onVerifyPin(newPin)
-                if (!success) {
-                    isError = true
-                    errorMessage = "رمز PIN غير صحيح. يرجى المحاولة ثانية."
-                    scope.launch {
-                        // Shake animation
-                        for (i in 0..2) {
-                            shakeOffset.animateTo(20f, tween(50))
-                            shakeOffset.animateTo(-20f, tween(50))
+                if (isPreview) {
+                    // Preview verification: 1234 or any 4 digits simulates success if matches, or can test wrong pin
+                    val isDemoValid = (newPin == "1234")
+                    if (isDemoValid) {
+                        isSuccess = true
+                        scope.launch {
+                            delay(1400)
+                            isSuccess = false
+                            enteredPin = ""
                         }
-                        shakeOffset.animateTo(0f, tween(50))
-                        delay(400)
-                        enteredPin = ""
+                    } else {
+                        isError = true
+                        errorMessage = customTexts.errorMessageWrongPin
+                        scope.launch {
+                            for (i in 0..2) {
+                                shakeOffset.animateTo(20f, tween(50))
+                                shakeOffset.animateTo(-20f, tween(50))
+                            }
+                            shakeOffset.animateTo(0f, tween(50))
+                            delay(600)
+                            enteredPin = ""
+                        }
+                    }
+                } else {
+                    val success = onVerifyPin(newPin)
+                    if (success) {
+                        if (customTexts.isSuccessTextEnabled && customTexts.successText.isNotBlank()) {
+                            isSuccess = true
+                        }
+                    } else {
+                        isError = true
+                        errorMessage = customTexts.errorMessageWrongPin
+                        scope.launch {
+                            // Shake animation
+                            for (i in 0..2) {
+                                shakeOffset.animateTo(20f, tween(50))
+                                shakeOffset.animateTo(-20f, tween(50))
+                            }
+                            shakeOffset.animateTo(0f, tween(50))
+                            delay(400)
+                            enteredPin = ""
+                        }
                     }
                 }
             }
@@ -105,6 +140,7 @@ fun BiometricLockScreen(
     }
 
     fun handleBackspace() {
+        if (isSuccess) return
         if (enteredPin.isNotEmpty()) {
             enteredPin = enteredPin.dropLast(1)
             isError = false
@@ -113,6 +149,7 @@ fun BiometricLockScreen(
     }
 
     fun handleClear() {
+        if (isSuccess) return
         enteredPin = ""
         isError = false
         errorMessage = ""
@@ -132,43 +169,96 @@ fun BiometricLockScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Header Security Shield
+            // Header Security Shield / Success Icon
             Box(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(CircleShape)
-                    .background(CyberPrimary.copy(alpha = 0.12f))
-                    .border(2.dp, if (isError) CyberDanger else CyberPrimary, CircleShape),
+                    .background(
+                        when {
+                            isSuccess -> CyberSuccess.copy(alpha = 0.15f)
+                            isError -> CyberDanger.copy(alpha = 0.12f)
+                            else -> CyberPrimary.copy(alpha = 0.12f)
+                        }
+                    )
+                    .border(
+                        2.dp,
+                        when {
+                            isSuccess -> CyberSuccess
+                            isError -> CyberDanger
+                            else -> CyberPrimary
+                        },
+                        CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (isError) Icons.Default.Lock else Icons.Default.Security,
+                    imageVector = when {
+                        isSuccess -> Icons.Default.CheckCircle
+                        isError -> Icons.Default.Lock
+                        else -> Icons.Default.Security
+                    },
                     contentDescription = "أمان المنظومة",
-                    tint = if (isError) CyberDanger else CyberPrimary,
+                    tint = when {
+                        isSuccess -> CyberSuccess
+                        isError -> CyberDanger
+                        else -> CyberPrimary
+                    },
                     modifier = Modifier.size(44.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "منظومة جعفر بدران للأدلة الجنائية",
-                color = TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
+            // 1. عنوان الشاشة
+            if (customTexts.isScreenTitleEnabled && customTexts.screenTitle.isNotBlank()) {
+                Text(
+                    text = customTexts.screenTitle,
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            // 2. النص الترحيبي الرئيسي
+            if (customTexts.isGreetingEnabled && customTexts.greetingText.isNotBlank()) {
+                Text(
+                    text = customTexts.greetingText,
+                    color = CyberPrimaryLight,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
 
-            Text(
-                text = "المنظومة مشفرة ومؤمنة بالكامل. أدخل رمز PIN للمتابعة",
-                color = TextSecondary,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center
-            )
+            // 3. النص الموجود أسفل العنوان
+            if (customTexts.isSubtitleEnabled && customTexts.subtitleText.isNotBlank()) {
+                Text(
+                    text = customTexts.subtitleText,
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // 4. النص فوق حقل كلمة المرور / رمز PIN
+            if (customTexts.isPinPromptEnabled && customTexts.pinPromptText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = customTexts.pinPromptText,
+                    color = TextPrimary.copy(alpha = 0.9f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // PIN Indicator Dots
             Row(
@@ -179,6 +269,7 @@ fun BiometricLockScreen(
                 for (i in 0 until 4) {
                     val isFilled = i < enteredPin.length
                     val dotColor = when {
+                        isSuccess -> CyberSuccess
                         isError -> CyberDanger
                         isFilled -> CyberPrimary
                         else -> MaterialTheme.colorScheme.surfaceVariant
@@ -190,28 +281,49 @@ fun BiometricLockScreen(
                             .background(dotColor)
                             .border(
                                 width = 1.5.dp,
-                                color = if (isError) CyberDanger else CyberPrimaryLight,
+                                color = when {
+                                    isSuccess -> CyberSuccess
+                                    isError -> CyberDanger
+                                    else -> CyberPrimaryLight
+                                },
                                 shape = CircleShape
                             )
                     )
                 }
             }
 
-            // Error feedback
-            Box(modifier = Modifier.height(26.dp)) {
-                if (isError && errorMessage.isNotBlank()) {
+            // 5. النص الإرشادي داخل حقل كلمة المرور (عندما لا يوجد إدخال)
+            Box(
+                modifier = Modifier.height(26.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSuccess && customTexts.isSuccessTextEnabled && customTexts.successText.isNotBlank()) {
+                    Text(
+                        text = customTexts.successText,
+                        color = CyberSuccess,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                } else if (isError && errorMessage.isNotBlank()) {
                     Text(
                         text = errorMessage,
                         color = CyberDanger,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 6.dp)
+                        textAlign = TextAlign.Center
+                    )
+                } else if (enteredPin.isEmpty() && customTexts.isPinPlaceholderEnabled && customTexts.pinPlaceholderText.isNotBlank()) {
+                    Text(
+                        text = customTexts.pinPlaceholderText,
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Numeric Keypad Grid
             Column(
@@ -244,14 +356,24 @@ fun BiometricLockScreen(
                     if (isBiometricAvailable) {
                         KeypadActionButton(
                             icon = Icons.Default.Fingerprint,
-                            contentDescription = "استخدام البصمة",
-                            onClick = onTriggerBiometric,
+                            contentDescription = customTexts.biometricKeypadLabel,
+                            onClick = {
+                                if (isPreview) {
+                                    isSuccess = true
+                                    scope.launch {
+                                        delay(1200)
+                                        isSuccess = false
+                                    }
+                                } else {
+                                    onTriggerBiometric()
+                                }
+                            },
                             tag = "biometric_prompt_button",
                             tint = CyberPrimaryLight
                         )
                     } else {
                         KeypadTextActionButton(
-                            text = "مسح",
+                            text = customTexts.clearButtonText,
                             onClick = { handleClear() },
                             tag = "pin_clear_button"
                         )
@@ -261,7 +383,7 @@ fun BiometricLockScreen(
 
                     KeypadActionButton(
                         icon = Icons.AutoMirrored.Filled.Backspace,
-                        contentDescription = "حذف الرقم",
+                        contentDescription = customTexts.backspaceDescription,
                         onClick = { handleBackspace() },
                         tag = "pin_backspace_button",
                         tint = TextSecondary
@@ -269,12 +391,22 @@ fun BiometricLockScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            // Biometric Trigger Direct Action Button
-            if (isBiometricAvailable) {
+            // 8. زر المصادقة بالبصمة الحيوية
+            if (isBiometricAvailable && customTexts.isBiometricButtonEnabled && customTexts.biometricButtonText.isNotBlank()) {
                 Button(
-                    onClick = onTriggerBiometric,
+                    onClick = {
+                        if (isPreview) {
+                            isSuccess = true
+                            scope.launch {
+                                delay(1200)
+                                isSuccess = false
+                            }
+                        } else {
+                            onTriggerBiometric()
+                        }
+                    },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = CyberPrimary.copy(alpha = 0.15f),
                         contentColor = CyberPrimary
@@ -292,22 +424,23 @@ fun BiometricLockScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "المصادقة بالبصمة الحيوية",
+                        text = customTexts.biometricButtonText,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Default PIN Hint
-            Text(
-                text = "رمز PIN الافتراضي: 1234 (يمكن تعديله من سجل الأمان)",
-                color = TextMuted,
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center
-            )
+            // 10. تلميح الرمز الافتراضي
+            if (customTexts.isDefaultPinHintEnabled && customTexts.defaultPinHintText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = customTexts.defaultPinHintText,
+                    color = TextMuted,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

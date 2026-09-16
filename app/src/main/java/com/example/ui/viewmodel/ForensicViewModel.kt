@@ -38,6 +38,7 @@ import com.example.data.local.entities.FinancialRevenueEntity
 import com.example.data.preferences.BottomBarDataStore
 import com.example.data.preferences.BottomBarItemConfig
 import com.example.data.preferences.BottomBarSettings
+import com.example.data.preferences.LockScreenCustomTexts
 import com.example.ui.navigation.ScreenDestination
 import com.example.data.remote.SheetReadResult
 import com.example.data.repository.ExternalRequestsRepository
@@ -111,6 +112,16 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     // Language Toggle: "ar" or "en"
     private val _currentLanguage = MutableStateFlow("ar")
     val currentLanguage = _currentLanguage.asStateFlow()
+
+    // Lock Screen Custom Texts (Ar & En independent customization)
+    private val _lockScreenTextsAr = MutableStateFlow(LockScreenCustomTexts.defaultForLanguage("ar"))
+    val lockScreenTextsAr = _lockScreenTextsAr.asStateFlow()
+
+    private val _lockScreenTextsEn = MutableStateFlow(LockScreenCustomTexts.defaultForLanguage("en"))
+    val lockScreenTextsEn = _lockScreenTextsEn.asStateFlow()
+
+    private val _lockScreenTexts = MutableStateFlow(LockScreenCustomTexts.defaultForLanguage("ar"))
+    val lockScreenTexts = _lockScreenTexts.asStateFlow()
 
     // Google Sheets Sync Settings
     val sheetId = MutableStateFlow("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms")
@@ -295,6 +306,18 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
             if (savedBio != null) {
                 _isBiometricHardwareEnabled.value = (savedBio == "true")
             }
+
+            // Load customized lock screen texts for AR and EN
+            val savedTextsAr = repository.getSetting("lock_screen_texts_ar")
+            val textsAr = LockScreenCustomTexts.fromJson(savedTextsAr, "ar")
+            _lockScreenTextsAr.value = textsAr
+
+            val savedTextsEn = repository.getSetting("lock_screen_texts_en")
+            val textsEn = LockScreenCustomTexts.fromJson(savedTextsEn, "en")
+            _lockScreenTextsEn.value = textsEn
+
+            _lockScreenTexts.value = if (_currentLanguage.value == "en") textsEn else textsAr
+
             val savedTitle = repository.getSettingValue("system_topbar_title", "منظومة جعفر بدران")
             topBarTitle.value = savedTitle
             val savedSub = repository.getSettingValue("system_topbar_subtitle", "إدارة العمل والقضايا والطلبات")
@@ -730,6 +753,46 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
 
     fun setLanguage(lang: String) {
         _currentLanguage.value = lang
+        _lockScreenTexts.value = if (lang == "en") _lockScreenTextsEn.value else _lockScreenTextsAr.value
+        viewModelScope.launch {
+            repository.saveSetting("app_language", lang)
+        }
+    }
+
+    fun getLockScreenTextsForLanguage(lang: String): LockScreenCustomTexts {
+        return if (lang == "en") _lockScreenTextsEn.value else _lockScreenTextsAr.value
+    }
+
+    fun saveLockScreenTexts(config: LockScreenCustomTexts) {
+        viewModelScope.launch {
+            val lang = config.language
+            val json = LockScreenCustomTexts.toJson(config)
+            val key = if (lang == "en") "lock_screen_texts_en" else "lock_screen_texts_ar"
+            repository.saveSetting(key, json)
+            if (lang == "en") {
+                _lockScreenTextsEn.value = config
+            } else {
+                _lockScreenTextsAr.value = config
+            }
+            if (_currentLanguage.value == lang) {
+                _lockScreenTexts.value = config
+            }
+            showHud(if (lang == "en") "Lock screen texts saved successfully" else "تم حفظ نصوص شاشة القفل بنجاح", HudType.SUCCESS)
+            repository.logAudit(
+                actionType = "UPDATE_LOCK_TEXTS",
+                module = "SECURITY",
+                entityId = key,
+                details = "تحديث تخصيص نصوص شاشة قفل التطبيق للغة ($lang)"
+            )
+        }
+    }
+
+    fun resetLockScreenTexts(lang: String) {
+        viewModelScope.launch {
+            val defaultTexts = LockScreenCustomTexts.defaultForLanguage(lang)
+            saveLockScreenTexts(defaultTexts)
+            showHud(if (lang == "en") "Reset to default texts" else "تمت استعادة النصوص الافتراضية بنجاح", HudType.INFO)
+        }
     }
 
     fun setRole(role: String) {

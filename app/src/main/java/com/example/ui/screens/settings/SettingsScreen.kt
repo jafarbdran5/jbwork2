@@ -72,6 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -100,7 +101,8 @@ fun SettingsScreen(
     viewModel: ForensicViewModel,
     onNavigateToTrash: () -> Unit,
     onNavigateToAdmin: () -> Unit = {},
-    onNavigateToBottomBarSettings: () -> Unit = {}
+    onNavigateToBottomBarSettings: () -> Unit = {},
+    onNavigateToLockScreenCustomization: (() -> Unit)? = null
 ) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val isScreenshotProtected by viewModel.isScreenshotProtection.collectAsState()
@@ -114,6 +116,7 @@ fun SettingsScreen(
     val bottomBarSettings by viewModel.bottomBarSettings.collectAsState()
     val context = LocalContext.current
     var showBottomBarSettingsModal by remember { mutableStateOf(false) }
+    var showLockScreenCustomizationModal by remember { mutableStateOf(false) }
 
     val logoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -865,6 +868,51 @@ fun SettingsScreen(
                             Text("قفل الآن", color = CyberDanger, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(CyberBorder.copy(alpha = 0.5f))
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Customize Password / Lock Screen Texts
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "تخصيص شاشة كلمة المرور",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "تعديل كافة العناوين، الرسائل، الأخطاء والترحيب باللغتين العربية والإنجليزية",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                if (onNavigateToLockScreenCustomization != null) {
+                                    onNavigateToLockScreenCustomization()
+                                } else {
+                                    showLockScreenCustomizationModal = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary.copy(alpha = 0.15f)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("settings_customize_lock_screen_btn")
+                        ) {
+                            Text("تخصيص", color = CyberPrimaryLight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }
@@ -987,6 +1035,18 @@ fun SettingsScreen(
             BottomBarSettingsScreen(
                 viewModel = viewModel,
                 onNavigateBack = { showBottomBarSettingsModal = false }
+            )
+        }
+    }
+
+    if (showLockScreenCustomizationModal) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showLockScreenCustomizationModal = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            LockScreenCustomizationScreen(
+                viewModel = viewModel,
+                onNavigateBack = { showLockScreenCustomizationModal = false }
             )
         }
     }
