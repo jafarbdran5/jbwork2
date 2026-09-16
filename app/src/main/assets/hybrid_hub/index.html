@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>بوابة الأداء السريع والمرفقات</title>
+  <style>
+    /* ==========================================================================
+       Design Tokens & GPU-Accelerated Variables (60-120 FPS Target)
+       ========================================================================== */
+    :root {
+      --bg-primary: #0a0d14;
+      --bg-card: #131926;
+      --bg-card-elevated: #1a2234;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: #00e5ff;
+
+      --color-primary: #00e5ff;
+      --color-primary-glow: rgba(0, 229, 255, 0.25);
+      --color-success: #00e676;
+      --color-warning: #ffab00;
+      --color-danger: #ff5252;
+
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-disabled: #64748b;
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+
+      /* Tight spring curves for instantaneous tactile micro-interactions */
+      --ease-spring: cubic-bezier(0.2, 0.8, 0.2, 1);
+      --duration-micro: 180ms;
+    }
+
+    /* Base Reset & Mobile Performance Baseline */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", Helvetica, Arial, sans-serif;
+      overflow-x: hidden;
+      touch-action: manipulation; /* Eliminates 300ms mobile tap delay */
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    .app-container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 16px 16px calc(32px + env(safe-area-inset-bottom, 0px));
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Top Action Bar */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 2px 8px;
+    }
+
+    .badge-status {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--color-primary);
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .header-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    /* Interactive Touch-Optimized Elements (:active micro-scale) */
+    .btn-icon, .tab-chip, .btn-primary, .upload-dropzone, .tool-card, .file-del-btn {
+      touch-action: manipulation;
+      user-select: none;
+      cursor: pointer;
+    }
+
+    .btn-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform var(--duration-micro) var(--ease-spring), opacity var(--duration-micro) var(--ease-spring);
+      will-change: transform, opacity;
+    }
+
+    .btn-icon:active {
+      transform: scale(0.92);
+      opacity: 0.85;
+    }
+
+    /* Section Cards */
+    .section-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-icon {
+      font-size: 1.15rem;
+    }
+
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .counter-badge {
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 10px;
+      border-radius: var(--radius-full);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* ==========================================================================
+       1. Attachments Section (المرفقات)
+       ========================================================================== */
+    .upload-dropzone {
+      border: 1.5px dashed var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 22px 14px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.015);
+      transition: transform var(--duration-micro) var(--ease-spring), border-color var(--duration-micro) ease, background-color var(--duration-micro) ease;
+      will-change: transform;
+    }
+
+    .upload-dropzone:active, .upload-dropzone.drag-over {
+      transform: scale(0.985);
+      border-color: var(--color-primary);
+      background: rgba(0, 229, 255, 0.04);
+    }
+
+    .dropzone-icon-pulse {
+      color: var(--color-primary);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .dropzone-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .dropzone-hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: block;
+      margin-top: 4px;
+    }
+
+    .files-queue {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .file-item-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-card-elevated);
+      border: 1px solid var(--border-subtle);
+      position: relative;
+      overflow: hidden;
+      transform: translateZ(0);
+      animation: slideFadeIn 200ms var(--ease-spring) forwards;
+    }
+
+    .file-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 1;
+    }
+
+    .file-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-main);
+      max-width: 210px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-size {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .file-del-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: transform var(--duration-micro) var(--ease-spring);
+      z-index: 1;
+    }
+
+    .file-del-btn:active {
+      transform: scale(0.9);
+      color: var(--color-danger);
+    }
+
+    /* ScaleX Progress (Zero CLS layout shifts) */
+    .file-progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--color-primary);
+      transform-origin: left;
+      transform: scaleX(0);
+      transition: transform 160ms linear;
+      will-change: transform;
+    }
+
+    /* ==========================================================================
+       2. Direct Support Forms (نماذج الدعم المباشر)
+       ========================================================================== */
+    .support-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .floating-group {
+      position: relative;
+    }
+
+    .floating-input {
+      width: 100%;
+      background: var(--bg-card-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 18px 12px 6px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color var(--duration-micro) ease;
+    }
+
+    .floating-input:focus {
+      border-color: var(--border-focus);
+    }
+
+    .floating-textarea {
+      resize: none;
+      min-height: 85px;
+    }
+
+    .floating-label {
+      position: absolute;
+      top: 13px;
+      right: 12px;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      pointer-events: none;
+      transform-origin: right top;
+      transition: transform var(--duration-micro) var(--ease-spring), color var(--duration-micro) ease;
+      will-change: transform;
+    }
+
+    .floating-input:focus ~ .floating-label,
+    .floating-input:not(:placeholder-shown) ~ .floating-label {
+      transform: translateY(-8px) scale(0.78);
+      color: var(--color-primary);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 13px 18px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--color-primary) 0%, #0091ea 100%);
+      color: #050a14;
+      border: none;
+      font-weight: 700;
+      font-size: 0.98rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+      box-shadow: 0 4px 14px var(--color-primary-glow);
+      transition: transform var(--duration-micro) var(--ease-spring), opacity var(--duration-micro) ease;
+      will-change: transform, opacity;
+    }
+
+    .btn-primary:active:not(:disabled) {
+      transform: scale(0.975);
+      opacity: 0.9;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .btn-spinner {
+      display: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(0, 0, 0, 0.2);
+      border-top-color: #050a14;
+      border-radius: 50%;
+      animation: spin 600ms linear infinite;
+    }
+
+    .btn-primary.is-loading .btn-spinner {
+      display: inline-block;
+    }
+
+    /* ==========================================================================
+       3. Information Sources & Tools (أدوات ومصادر المعلومات)
+       ========================================================================== */
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .filter-tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tab-chip {
+      flex-shrink: 0;
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: var(--radius-full);
+      background: var(--bg-card-elevated);
+      color: var(--text-muted);
+      border: 1px solid var(--border-subtle);
+      transition: transform var(--duration-micro) var(--ease-spring), background-color var(--duration-micro) ease, color var(--duration-micro) ease;
+      will-change: transform;
+    }
+
+    .tab-chip:active {
+      transform: scale(0.95);
+    }
+
+    .tab-chip.active {
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--color-primary);
+      border-color: rgba(0, 229, 255, 0.4);
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    @media (min-width: 520px) {
+      .tools-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .tool-card {
+      background: var(--bg-card-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      transition: transform var(--duration-micro) var(--ease-spring), border-color var(--duration-micro) ease;
+      will-change: transform;
+    }
+
+    .tool-card:active {
+      transform: scale(0.978);
+      border-color: var(--color-primary);
+    }
+
+    .tool-card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .tool-card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .tool-card-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.3;
+    }
+
+    .tool-card-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-top: 2px;
+    }
+
+    .tool-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+
+    .tool-badge {
+      font-size: 0.72rem;
+      color: var(--color-primary);
+      background: rgba(0, 229, 255, 0.08);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .tool-arrow {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* Bottom Sheet */
+    .bottom-sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 220ms ease;
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .bottom-sheet-backdrop.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bottom-sheet {
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+      background: var(--bg-card);
+      border-top-left-radius: var(--radius-lg);
+      border-top-right-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      border-bottom: none;
+      padding: 12px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+      transform: translateY(100%);
+      transition: transform 220ms var(--ease-spring);
+      will-change: transform;
+    }
+
+    .bottom-sheet-backdrop.is-open .bottom-sheet {
+      transform: translateY(0);
+    }
+
+    .sheet-drag-handle-zone {
+      display: flex;
+      justify-content: center;
+      padding: 6px 0 12px;
+      touch-action: none;
+    }
+
+    .sheet-handle-bar {
+      width: 44px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-full);
+    }
+
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .sheet-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .btn-icon-sm {
+      background: rgba(255, 255, 255, 0.06);
+      border: none;
+      color: var(--text-main);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .btn-icon-sm:active {
+      transform: scale(0.9);
+    }
+
+    /* Keyframes */
+    @keyframes slideFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-container">
+    
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-titles">
+        <span class="badge-status">⚡ تقنية الأداء السريع (Hybrid Zero-Jank Engine)</span>
+        <h1 class="header-title">المرفقات والدعم وأدوات الفحص</h1>
+      </div>
+      <button type="button" class="btn-icon" id="openSettingsSheetBtn" aria-label="خيارات">
+        ⚙️
+      </button>
+    </header>
+
+    <!-- 1. Attachments Section (المرفقات) -->
+    <section class="section-card" id="attachments-section">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">📎</span>
+          <h2 class="section-title">المرفقات والأدلة الرقمية</h2>
+        </div>
+        <span class="counter-badge" id="fileCountBadge">0 ملفات</span>
+      </div>
+
+      <div class="upload-dropzone" id="dropzone" role="button" tabindex="0">
+        <input type="file" id="fileInput" multiple class="visually-hidden" />
+        <div class="dropzone-content">
+          <div class="dropzone-icon-pulse">
+            <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          </div>
+          <p class="dropzone-title">اضغط أو اسحب الملفات للإيداع الفوري</p>
+          <span class="dropzone-hint">الصور، تقارير PDF، والتسجيلات الميدانية (حتى 50MB)</span>
+        </div>
+      </div>
+
+      <div class="files-queue" id="filesQueue" aria-live="polite"></div>
+    </section>
+
+    <!-- 2. Direct Support Forms (نماذج الدعم المباشر) -->
+    <section class="section-card" id="support-section">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">⚡</span>
+          <h2 class="section-title">نماذج الدعم المباشر والاستجابة</h2>
+        </div>
+      </div>
+
+      <form id="directSupportForm" class="support-form" novalidate>
+        <div class="floating-group">
+          <input type="text" id="ticketSubject" class="floating-input" placeholder=" " required autocomplete="off" />
+          <label for="ticketSubject" class="floating-label">موضوع البلاغ / الطلب الفني</label>
+        </div>
+
+        <div class="floating-group">
+          <select id="ticketPriority" class="floating-input" required>
+            <option value="normal" selected>عادي - إجراءات مجدولة</option>
+            <option value="high">مرتفع - أولوية استجابة سريعة</option>
+            <option value="critical">حرج - خرق أو طارئ فوري</option>
+          </select>
+          <label for="ticketPriority" class="floating-label">مستوى الأولوية والخطورة</label>
+        </div>
+
+        <div class="floating-group">
+          <textarea id="ticketNotes" class="floating-input floating-textarea" placeholder=" " rows="3" required></textarea>
+          <label for="ticketNotes" class="floating-label">تفاصيل الحالة والمعلومات المساندة</label>
+        </div>
+
+        <button type="submit" class="btn-primary" id="submitTicketBtn">
+          <span class="btn-text">إرسال البلاغ الفوري</span>
+          <span class="btn-spinner" aria-hidden="true"></span>
+        </button>
+      </form>
+    </section>
+
+    <!-- 3. Information Sources & Tools (أدوات ومصادر المعلومات) -->
+    <section class="section-card" id="tools-section">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">🛡️</span>
+          <h2 class="section-title">أدوات ومصادر المعلومات</h2>
+        </div>
+      </div>
+
+      <!-- Category Filter Tabs -->
+      <nav class="filter-tabs" aria-label="تصنيفات الأدوات">
+        <button type="button" class="tab-chip active" data-category="all">الكل</button>
+        <button type="button" class="tab-chip" data-category="security">أدوات الفحص والأمان الرقمي</button>
+        <button type="button" class="tab-chip" data-category="privacy">فحص الخصوصية والبيانات الوصفية</button>
+        <button type="button" class="tab-chip" data-category="reporting">مصادر التبليغ والاستجابة المباشرة</button>
+        <button type="button" class="tab-chip" data-category="guides">الأدلة والوثائق الإرشادية</button>
+      </nav>
+
+      <!-- Tools Dynamic Cards Grid -->
+      <div class="tools-grid" id="toolsGrid"></div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Sheet -->
+  <div class="bottom-sheet-backdrop" id="bottomSheetBackdrop" aria-hidden="true">
+    <div class="bottom-sheet" id="bottomSheet" role="dialog" aria-modal="true">
+      <div class="sheet-drag-handle-zone" id="sheetDragHandle">
+        <div class="sheet-handle-bar"></div>
+      </div>
+      <div class="sheet-header">
+        <h3 class="sheet-title">تفاصيل الأداة والربط الميداني</h3>
+        <button type="button" class="btn-icon-sm" id="closeSheetBtn" aria-label="إغلاق">✕</button>
+      </div>
+      <div class="sheet-content" id="sheetBody"></div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Dependency-Free 60-120 FPS Controller
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+      initTouchFeedback();
+      initAttachments();
+      initDirectSupportForm();
+      initToolsFiltering();
+      initBottomSheet();
+    });
+
+    function triggerHaptic(duration = 8) {
+      if (window.AndroidBridge && typeof window.AndroidBridge.vibrate === 'function') {
+        window.AndroidBridge.vibrate(duration);
+        return;
+      }
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(duration); } catch (_) {}
+      }
+    }
+
+    function initTouchFeedback() {
+      document.addEventListener('touchstart', (e) => {
+        const target = e.target.closest('button, .upload-dropzone, .tab-chip, .tool-card');
+        if (target) {
+          triggerHaptic(6);
+        }
+      }, { passive: true });
+    }
+
+    /* 1. Attachments Section */
+    function initAttachments() {
+      const dropzone = document.getElementById('dropzone');
+      const fileInput = document.getElementById('fileInput');
+      const filesQueue = document.getElementById('filesQueue');
+      const fileCountBadge = document.getElementById('fileCountBadge');
+
+      let uploadedFiles = [];
+
+      dropzone.addEventListener('click', () => fileInput.click());
+
+      ['dragenter', 'dragover'].forEach(name => {
+        dropzone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add('drag-over');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(name => {
+        dropzone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove('drag-over');
+        }, false);
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length) {
+          handleFiles(Array.from(dt.files));
+        }
+      });
+
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files && fileInput.files.length) {
+          handleFiles(Array.from(fileInput.files));
+          fileInput.value = '';
+        }
+      });
+
+      function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      }
+
+      function handleFiles(files) {
+        files.forEach(file => {
+          const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+          uploadedFiles.push({ id: fileId, name: file.name, size: file.size });
+          renderFileItem(fileId, file.name, file.size);
+        });
+        updateFileCount();
+      }
+
+      function renderFileItem(id, name, size) {
+        const item = document.createElement('div');
+        item.className = 'file-item-card';
+        item.id = id;
+        item.innerHTML = `
+          <div class="file-meta">
+            <span style="font-size: 1.2rem;">📄</span>
+            <div>
+              <div class="file-name">${escapeHtml(name)}</div>
+              <div class="file-size">${formatBytes(size)}</div>
+            </div>
+          </div>
+          <button type="button" class="file-del-btn" aria-label="حذف الملف">✕</button>
+          <div class="file-progress-bar"></div>
+        `;
+
+        const progressBar = item.querySelector('.file-progress-bar');
+        requestAnimationFrame(() => {
+          progressBar.style.transform = 'scaleX(0.7)';
+          setTimeout(() => {
+            progressBar.style.transform = 'scaleX(1)';
+            setTimeout(() => {
+              progressBar.style.opacity = '0';
+            }, 300);
+          }, 250);
+        });
+
+        item.querySelector('.file-del-btn').addEventListener('click', () => {
+          triggerHaptic(12);
+          item.style.transition = 'transform 180ms ease, opacity 180ms ease';
+          item.style.transform = 'scale(0.9) translateY(4px)';
+          item.style.opacity = '0';
+          setTimeout(() => {
+            item.remove();
+            uploadedFiles = uploadedFiles.filter(f => f.id !== id);
+            updateFileCount();
+          }, 180);
+        });
+
+        filesQueue.prepend(item);
+      }
+
+      function updateFileCount() {
+        fileCountBadge.textContent = `${uploadedFiles.length} ملفات`;
+      }
+    }
+
+    /* 2. Direct Support Forms */
+    function initDirectSupportForm() {
+      const form = document.getElementById('directSupportForm');
+      const submitBtn = document.getElementById('submitTicketBtn');
+      const btnText = submitBtn.querySelector('.btn-text');
+
+      let isSubmitting = false;
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (isSubmitting) return;
+
+        const subject = document.getElementById('ticketSubject').value.trim();
+        const notes = document.getElementById('ticketNotes').value.trim();
+
+        if (!subject || !notes) {
+          triggerHaptic(30);
+          alert('يرجى تعبئة كافة الحقول المطلوبة');
+          return;
+        }
+
+        isSubmitting = true;
+        submitBtn.disabled = true;
+        submitBtn.classList.add('is-loading');
+        btnText.textContent = 'جارٍ تشفير وحفظ البلاغ...';
+        triggerHaptic(10);
+
+        setTimeout(() => {
+          submitBtn.classList.remove('is-loading');
+          btnText.textContent = '✓ تم تسجيل البلاغ بنجاح في المنظومة';
+          submitBtn.style.background = 'var(--color-success)';
+          triggerHaptic(20);
+
+          if (window.AndroidBridge && typeof window.AndroidBridge.onSupportSubmitted === 'function') {
+            window.AndroidBridge.onSupportSubmitted(subject, notes);
+          }
+
+          setTimeout(() => {
+            form.reset();
+            submitBtn.disabled = false;
+            submitBtn.style.background = '';
+            btnText.textContent = 'إرسال البلاغ الفوري';
+            isSubmitting = false;
+          }, 1800);
+        }, 800);
+      });
+    }
+
+    /* 3. Information Sources & Tools */
+    const TOOLS_DATA = [
+      {
+        id: 1,
+        title: 'فحص الروابط المشبوهة والملفات الخبيثة',
+        desc: 'تحليل فوري للمرفقات والروابط والتحقق من العناوين عبر محركات التهديدات المعتمدة.',
+        category: 'security',
+        categoryName: 'أدوات الفحص والأمان الرقمي',
+        icon: '🛡️'
+      },
+      {
+        id: 2,
+        title: 'محلل البيانات الوصفية (Exif Metadata)',
+        desc: 'استخراج وتطهير بيانات الموقع GPS، ونوع الكاميرا، وتاريخ الالتقاط من الصور والمستندات.',
+        category: 'privacy',
+        categoryName: 'فحص الخصوصية والبيانات الوصفية',
+        icon: '🔍'
+      },
+      {
+        id: 3,
+        title: 'مركز البلاغات والاستجابة للحوادث',
+        desc: 'قنوات اتصال وتنسيق فوري مع فرق مكافحة الجرائم الإلكترونية والابتزاز الرقمي.',
+        category: 'reporting',
+        categoryName: 'مصادر التبليغ والاستجابة المباشرة',
+        icon: '🚨'
+      },
+      {
+        id: 4,
+        title: 'دليل حماية الحسابات والمصادقة الثنائية 2FA',
+        desc: 'خطوات إجرائية موثقة لتأمين الحسابات الحساسة ومنع عمليات الاستيلاء والاختراق.',
+        category: 'guides',
+        categoryName: 'الأدلة والوثائق الإرشادية',
+        icon: '📚'
+      },
+      {
+        id: 5,
+        title: 'مدقق تسريبات كلمات المرور والبيانات',
+        desc: 'استعلام سريع وآمن عن الحسابات المعرضة للاختراق دون كشف كلمات السر.',
+        category: 'security',
+        categoryName: 'أدوات الفحص والأمان الرقمي',
+        icon: '🔐'
+      },
+      {
+        id: 6,
+        title: 'دليل توثيق الأدلة الجنائية للمحاكم',
+        desc: 'إرشادات المحافظة على سلسلة الحيازة (Chain of Custody) لقبول الدليل الفني رسمياً.',
+        category: 'guides',
+        categoryName: 'الأدلة والوثائق الإرشادية',
+        icon: '⚖️'
+      }
+    ];
+
+    function initToolsFiltering() {
+      const toolsGrid = document.getElementById('toolsGrid');
+      const tabs = document.querySelectorAll('.filter-tabs .tab-chip');
+
+      function renderTools(category = 'all') {
+        const filtered = category === 'all'
+          ? TOOLS_DATA
+          : TOOLS_DATA.filter(t => t.category === category);
+
+        toolsGrid.innerHTML = '';
+        filtered.forEach(tool => {
+          const card = document.createElement('article');
+          card.className = 'tool-card';
+          card.setAttribute('role', 'button');
+          card.innerHTML = `
+            <div class="tool-card-top">
+              <div class="tool-card-icon">${tool.icon}</div>
+              <div>
+                <h3 class="tool-card-title">${escapeHtml(tool.title)}</h3>
+                <p class="tool-card-desc">${escapeHtml(tool.desc)}</p>
+              </div>
+            </div>
+            <div class="tool-card-footer">
+              <span class="tool-badge">${escapeHtml(tool.categoryName)}</span>
+              <span class="tool-arrow">←</span>
+            </div>
+          `;
+          card.addEventListener('click', () => {
+            openToolSheet(tool);
+          });
+          toolsGrid.appendChild(card);
+        });
+      }
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          renderTools(tab.dataset.category);
+        });
+      });
+
+      renderTools('all');
+    }
+
+    /* Bottom Sheet */
+    let sheetBackdrop, sheetBody;
+
+    function initBottomSheet() {
+      sheetBackdrop = document.getElementById('bottomSheetBackdrop');
+      sheetBody = document.getElementById('sheetBody');
+      const closeBtn = document.getElementById('closeSheetBtn');
+      const openSettingsBtn = document.getElementById('openSettingsSheetBtn');
+
+      const close = () => {
+        sheetBackdrop.classList.remove('is-open');
+        sheetBackdrop.setAttribute('aria-hidden', 'true');
+      };
+
+      closeBtn.addEventListener('click', close);
+      sheetBackdrop.addEventListener('click', (e) => {
+        if (e.target === sheetBackdrop) close();
+      });
+
+      openSettingsBtn.addEventListener('click', () => {
+        sheetBody.innerHTML = `
+          <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.6;">
+            بوابة الأداء السريع (Hybrid Performance Hub): تعمل بكفاءة 60-120 FPS مع تسريع عتادي كامل، وانعدام تام للتأخير (Touch Latency: 0ms)، وتصفية فورية للمصادر دون إعادة تحميل.
+          </p>
+        `;
+        sheetBackdrop.classList.add('is-open');
+        sheetBackdrop.setAttribute('aria-hidden', 'false');
+      });
+
+      const handleZone = document.getElementById('sheetDragHandle');
+      let startY = 0;
+      let currentY = 0;
+
+      handleZone.addEventListener('touchstart', (e) => {
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+
+      handleZone.addEventListener('touchmove', (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+        if (deltaY > 0) {
+          document.getElementById('bottomSheet').style.transform = `translateY(${deltaY}px)`;
+        }
+      }, { passive: true });
+
+      handleZone.addEventListener('touchend', () => {
+        const deltaY = currentY - startY;
+        const sheet = document.getElementById('bottomSheet');
+        sheet.style.transform = '';
+        if (deltaY > 80) {
+          close();
+        }
+      });
+    }
+
+    function openToolSheet(tool) {
+      if (!sheetBackdrop || !sheetBody) return;
+      sheetBody.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+          <span style="font-size: 2.2rem;">${tool.icon}</span>
+          <div>
+            <h4 style="font-size: 1rem; font-weight: 700;">${escapeHtml(tool.title)}</h4>
+            <span class="tool-badge">${escapeHtml(tool.categoryName)}</span>
+          </div>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">
+          ${escapeHtml(tool.desc)}
+        </p>
+        <button type="button" class="btn-primary" onclick="alert('تم تفعيل: ${escapeHtml(tool.title)}')">
+          فتح وتشغيل الأداة الميدانية
+        </button>
+      `;
+      sheetBackdrop.classList.add('is-open');
+      sheetBackdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

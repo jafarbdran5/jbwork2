@@ -41,10 +41,12 @@ import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material.icons.filled.Warning
+import com.example.ui.screens.hybrid.HybridPerformanceHubScreen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -152,13 +154,15 @@ fun InvestigationToolsScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddToolDialog = true },
-                containerColor = CyberPrimary,
-                contentColor = Color.White,
-                modifier = Modifier.testTag("add_investigation_tool_fab")
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "إضافة أداة فحص")
+            if (activeTab != 3) {
+                FloatingActionButton(
+                    onClick = { showAddToolDialog = true },
+                    containerColor = CyberPrimary,
+                    contentColor = Color.White,
+                    modifier = Modifier.testTag("add_investigation_tool_fab")
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "إضافة أداة فحص")
+                }
             }
         }
     ) { innerPadding ->
@@ -176,7 +180,7 @@ fun InvestigationToolsScreen(
                         favoritesCount = tools.count { it.isFavorite }
                     )
 
-                    // Tabs: All / Favorites / Recent
+                    // Tabs: All / Favorites / Recent / Hybrid Speed Hub
                     TabRow(
                         selectedTabIndex = activeTab,
                         containerColor = MaterialTheme.colorScheme.surface,
@@ -213,9 +217,20 @@ fun InvestigationToolsScreen(
                                 }
                             }
                         )
+                        Tab(
+                            selected = activeTab == 3,
+                            onClick = { viewModel.investigationActiveTab.value = 3 },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Icon(Icons.Default.Speed, contentDescription = null, tint = if (activeTab == 3) CyberPrimary else CyberPrimaryLight, modifier = Modifier.size(15.dp))
+                                    Text("الأداء السريع ⚡", fontSize = 12.sp, fontWeight = if (activeTab == 3) FontWeight.Bold else FontWeight.Normal)
+                                }
+                            }
+                        )
                     }
 
-                    // Search Box
+                    if (activeTab != 3) {
+                        // Search Box
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { viewModel.investigationSearchQuery.value = it },
@@ -313,11 +328,14 @@ fun InvestigationToolsScreen(
                             )
                         }
                     }
+                    } // end if (activeTab != 3)
                 }
             }
 
-            // Tools List
-            if (tools.isEmpty()) {
+            // Screen Content
+            if (activeTab == 3) {
+                HybridPerformanceHubScreen(viewModel = viewModel)
+            } else if (tools.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

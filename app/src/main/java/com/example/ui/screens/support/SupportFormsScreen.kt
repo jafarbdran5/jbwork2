@@ -42,9 +42,11 @@ import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import com.example.ui.screens.hybrid.HybridPerformanceHubScreen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -151,6 +153,15 @@ fun SupportFormsScreen(
     var selectedFormForDetails by remember { mutableStateOf<SupportFormEntity?>(null) }
     var selectedFormForCaseLink by remember { mutableStateOf<SupportFormEntity?>(null) }
     var showAddFormDialog by remember { mutableStateOf(false) }
+    var showHybridHub by remember { mutableStateOf(false) }
+
+    if (showHybridHub) {
+        HybridPerformanceHubScreen(
+            viewModel = viewModel,
+            onNavigateBack = { showHybridHub = false }
+        )
+        return
+    }
 
     val listState = rememberLazyListState()
     val isHeaderVisible by rememberScrollHeaderVisibility(
@@ -189,6 +200,48 @@ fun SupportFormsScreen(
                         totalCount = forms.size,
                         verifiedCount = forms.count { it.verified }
                     )
+
+                    // Quick Hybrid Access Banner
+                    Card(
+                        onClick = { showHybridHub = true },
+                        colors = CardDefaults.cardColors(containerColor = CyberPrimary.copy(alpha = 0.12f)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = null,
+                                    tint = CyberPrimary,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Text(
+                                    text = "بوابة الاستجابة السريعة (Hybrid Hub) ⚡",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CyberPrimaryLight
+                                )
+                            }
+                            Text(
+                                text = "فتح الفوري ←",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = CyberPrimary
+                            )
+                        }
+                    }
 
                     // Search Box - Compact & Responsive
                     OutlinedTextField(

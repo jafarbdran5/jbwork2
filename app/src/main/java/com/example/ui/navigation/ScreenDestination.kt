@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -44,7 +45,8 @@ enum class ScreenDestination(
     TRASH(9, "سلة المحذوفات", Icons.Default.Delete, 12, false),
     SETTINGS(10, "الإعدادات والمزامنة", Icons.Default.Settings, 13, false),
     SECURITY(11, "سجل الأمان والتدقيق", Icons.Default.Security, 14, false),
-    ADMIN_MANAGEMENT(15, "إدارة المنظومة", Icons.Default.AdminPanelSettings, 15, false);
+    ADMIN_MANAGEMENT(15, "إدارة المنظومة", Icons.Default.AdminPanelSettings, 15, false),
+    HYBRID_HUB(16, "بوابة الأداء السريع (Hybrid)", Icons.Default.Speed, 16, false);
 
     companion object {
         fun fromId(id: Int): ScreenDestination? = entries.find { it.id == id }

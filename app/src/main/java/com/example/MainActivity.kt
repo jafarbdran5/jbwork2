@@ -119,6 +119,7 @@ import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.studio.ContentStudioScreen
 import com.example.ui.screens.support.SupportFormsScreen
 import com.example.ui.screens.investigation.InvestigationToolsScreen
+import com.example.ui.screens.hybrid.HybridPerformanceHubScreen
 import com.example.ui.screens.tasks.TasksScreen
 import com.example.ui.screens.trash.TrashScreen
 import androidx.compose.ui.text.style.TextOverflow
@@ -226,6 +227,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                         add(ScreenDestination.TASKS)
                         add(ScreenDestination.SUPPORT_FORMS)
                         add(ScreenDestination.INVESTIGATION_HUB)
+                        add(ScreenDestination.HYBRID_HUB)
                         add(ScreenDestination.STUDIO)
                         add(ScreenDestination.CLIENTS)
                         add(ScreenDestination.KNOWLEDGE)
@@ -539,6 +541,10 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                         ScreenDestination.TASKS.id -> TasksScreen(viewModel = viewModel)
                                         ScreenDestination.SUPPORT_FORMS.id -> SupportFormsScreen(viewModel = viewModel)
                                         ScreenDestination.INVESTIGATION_HUB.id -> InvestigationToolsScreen(viewModel = viewModel)
+                                        ScreenDestination.HYBRID_HUB.id -> HybridPerformanceHubScreen(
+                                            viewModel = viewModel,
+                                            onNavigateBack = { currentScreen = ScreenDestination.DASHBOARD.id }
+                                        )
                                         ScreenDestination.STUDIO.id -> ContentStudioScreen(viewModel = viewModel)
                                         ScreenDestination.CLIENTS.id -> ClientsScreen(viewModel = viewModel)
                                         ScreenDestination.KNOWLEDGE.id -> KnowledgeBaseScreen(viewModel = viewModel)

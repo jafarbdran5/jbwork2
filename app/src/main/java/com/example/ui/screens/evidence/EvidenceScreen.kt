@@ -92,6 +92,7 @@ import com.example.ui.theme.CyberWarning
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.ui.screens.hybrid.HybridPerformanceHubScreen
 import com.example.ui.viewmodel.ForensicViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,7 +106,7 @@ fun EvidenceScreen(
     val casesList by viewModel.rawCases.collectAsStateWithLifecycle()
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("مستودع المرفقات والملفات", "فحص ومعاينة الصور (ELA)", "حساب البصمات الرقمية (Hash)")
+    val tabs = listOf("مستودع المرفقات والملفات", "فحص ومعاينة الصور (ELA)", "حساب البصمات الرقمية (Hash)", "المرفقات السريعة ⚡")
 
     var activeEvidenceDetail by remember { mutableStateOf<EvidenceEntity?>(null) }
     var evidenceToDelete by remember { mutableStateOf<EvidenceEntity?>(null) }
@@ -466,6 +467,11 @@ fun EvidenceScreen(
                         }
                     }
                 }
+            }
+
+            // Tab 3: Fast Hybrid Attachments & Support
+            if (selectedTabIndex == 3) {
+                HybridPerformanceHubScreen(viewModel = viewModel)
             }
         }
     }
