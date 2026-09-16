@@ -17,15 +17,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetState
@@ -33,12 +38,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.CyberBg
@@ -48,6 +57,7 @@ import com.example.ui.theme.CyberCardElevated
 import com.example.ui.theme.CyberDanger
 import com.example.ui.theme.CyberInfo
 import com.example.ui.theme.CyberPrimary
+import com.example.ui.theme.CyberPrimaryLight
 import com.example.ui.theme.CyberSecondary
 import com.example.ui.theme.CyberSuccess
 import com.example.ui.theme.CyberSurface
@@ -290,3 +300,105 @@ object ForensicCrypto {
         context.startActivity(intent)
     }
 }
+
+/**
+ * Privacy Masking Helpers & Zero-CLS Composables
+ */
+object PrivacyMaskUtils {
+    const val BULLET_CHAR = '•'
+
+    fun mask(original: String, isMasked: Boolean, minBullets: Int = 8): String {
+        if (!isMasked) return original
+        if (original.isBlank()) return "••••••••"
+        val count = original.length.coerceAtLeast(minBullets)
+        return BULLET_CHAR.toString().repeat(count)
+    }
+}
+
+@Composable
+fun PrivacyMaskText(
+    text: String,
+    isMasked: Boolean,
+    modifier: Modifier = Modifier,
+    color: Color = TextPrimary,
+    fontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
+    fontWeight: FontWeight? = null,
+    fontFamily: FontFamily? = null,
+    lineHeight: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
+    minBullets: Int = 8,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+    style: androidx.compose.ui.text.TextStyle = androidx.compose.ui.text.TextStyle.Default
+) {
+    val displayText = remember(text, isMasked, minBullets) {
+        PrivacyMaskUtils.mask(text, isMasked, minBullets)
+    }
+    Text(
+        text = displayText,
+        modifier = modifier,
+        color = if (isMasked) TextMuted else color,
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        fontFamily = fontFamily,
+        lineHeight = lineHeight,
+        maxLines = maxLines,
+        overflow = overflow,
+        letterSpacing = if (isMasked) 1.5.sp else androidx.compose.ui.unit.TextUnit.Unspecified,
+        style = style
+    )
+}
+
+@Composable
+fun PrivacyMaskToggle(
+    isMasked: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    showLabel: Boolean = false
+) {
+    if (showLabel) {
+        OutlinedButton(
+            onClick = onToggle,
+            modifier = modifier
+                .testTag("privacy_mask_toggle_btn"),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (isMasked) CyberPrimary.copy(alpha = 0.15f) else CyberCardElevated,
+                contentColor = if (isMasked) CyberPrimaryLight else TextSecondary
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (isMasked) CyberPrimary else CyberBorder.copy(alpha = 0.5f)
+            ),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = if (isMasked) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                contentDescription = if (isMasked) "إلغاء حجب البيانات" else "تعتيم البيانات (وضع الخصوصية)",
+                tint = if (isMasked) CyberPrimaryLight else TextSecondary,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (isMasked) "وضع الخصوصية: مفعل" else "وضع الخصوصية",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    } else {
+        IconButton(
+            onClick = onToggle,
+            modifier = modifier
+                .testTag("privacy_mask_toggle_btn")
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (isMasked) CyberPrimary.copy(alpha = 0.18f) else Color.Transparent)
+        ) {
+            Icon(
+                imageVector = if (isMasked) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                contentDescription = if (isMasked) "إلغاء حجب البيانات" else "تعتيم البيانات (وضع الخصوصية)",
+                tint = if (isMasked) CyberPrimaryLight else TextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+

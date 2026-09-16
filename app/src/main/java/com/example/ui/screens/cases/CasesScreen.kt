@@ -91,6 +91,8 @@ import com.example.ui.components.CyberCard
 import com.example.ui.components.ForensicCrypto
 import com.example.ui.components.HudType
 import com.example.ui.components.InAppConfirmationSheet
+import com.example.ui.components.PrivacyMaskText
+import com.example.ui.components.PrivacyMaskToggle
 import com.example.ui.components.PriorityBadge
 import com.example.ui.components.StatusBadge
 import com.example.ui.theme.CyberBg
@@ -160,6 +162,7 @@ fun CasesScreen(
     val allEvidence by viewModel.rawEvidence.collectAsStateWithLifecycle()
     val searchQuery by viewModel.caseSearchQuery.collectAsStateWithLifecycle()
     val activeStatus by viewModel.caseStatusFilter.collectAsStateWithLifecycle()
+    val isPrivacyMasked by viewModel.isPrivacyMasked.collectAsStateWithLifecycle()
 
     var activeCaseDetail by remember { mutableStateOf<CaseEntity?>(null) }
     var caseToEdit by remember { mutableStateOf<CaseEntity?>(null) }
@@ -272,10 +275,17 @@ fun CasesScreen(
                         )
                     }
 
-                    CyberBadge(
-                        text = "${casesList.size} ملفات",
-                        accentColor = CyberPrimary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PrivacyMaskToggle(
+                            isMasked = isPrivacyMasked,
+                            onToggle = { viewModel.togglePrivacyMasking() }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CyberBadge(
+                            text = "${casesList.size} ملفات",
+                            accentColor = CyberPrimary
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -358,6 +368,7 @@ fun CasesScreen(
                     items(casesList, key = { it.id }) { item ->
                         CaseCard(
                             item = item,
+                            isMasked = isPrivacyMasked,
                             onClick = { activeCaseDetail = item },
                             onEdit = { openEditCase(item) },
                             onDelete = { caseToDelete = item },
@@ -391,6 +402,7 @@ fun CasesScreen(
     if (caseForPayment != null) {
         AddPaymentDialog(
             caseEntity = caseForPayment!!,
+            isMasked = isPrivacyMasked,
             onDismiss = { caseForPayment = null },
             onConfirmPayment = { amount, method, date, notes, receipt ->
                 viewModel.addCasePayment(
@@ -409,6 +421,7 @@ fun CasesScreen(
     if (caseForPriceUpdate != null) {
         UpdateCasePriceDialog(
             caseEntity = caseForPriceUpdate!!,
+            isMasked = isPrivacyMasked,
             onDismiss = { caseForPriceUpdate = null },
             onConfirmUpdate = { newPrice, notes ->
                 viewModel.updateCasePrice(
@@ -483,7 +496,7 @@ fun CasesScreen(
                                     Icon(Icons.Default.Receipt, contentDescription = null, tint = CyberSecondary, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("معرف المنصة الخارجية: ", color = TextSecondary, fontSize = 11.sp)
-                                    Text(extId, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    PrivacyMaskText(extId, isMasked = isPrivacyMasked, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                             currentCase.supportTicketId.takeIf { it.isNotBlank() }?.let { ticket ->
@@ -491,7 +504,7 @@ fun CasesScreen(
                                     Icon(Icons.Default.Description, contentDescription = null, tint = CyberInfo, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("رقم تذكرة الدعم: ", color = TextSecondary, fontSize = 11.sp)
-                                    Text(ticket, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    PrivacyMaskText(ticket, isMasked = isPrivacyMasked, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                             currentCase.targetIdentifier.takeIf { it.isNotBlank() }?.let { target ->
@@ -499,7 +512,7 @@ fun CasesScreen(
                                     Icon(Icons.Default.Share, contentDescription = null, tint = CyberWarning, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("المعرف / الرابط المستهدف: ", color = TextSecondary, fontSize = 11.sp)
-                                    Text(target, color = CyberPrimaryLight, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                    PrivacyMaskText(target, isMasked = isPrivacyMasked, color = CyberPrimaryLight, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                                 }
                             }
                             currentCase.internalCaseEmail.takeIf { it.isNotBlank() }?.let { email ->
@@ -512,7 +525,7 @@ fun CasesScreen(
                                         Icon(Icons.Default.Message, contentDescription = null, tint = CyberPrimaryLight, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text("البريد الداخلي للقضية: ", color = TextSecondary, fontSize = 11.sp)
-                                        Text(email, color = CyberPrimaryLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        PrivacyMaskText(email, isMasked = isPrivacyMasked, color = CyberPrimaryLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                     IconButton(
                                         onClick = {
@@ -557,7 +570,7 @@ fun CasesScreen(
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                             Text("${idItem.type}: ", color = TextSecondary, fontSize = 11.sp)
-                                            Text(idItem.value, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                            PrivacyMaskText(idItem.value, isMasked = isPrivacyMasked, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                                         }
                                         IconButton(
                                             onClick = {
@@ -583,13 +596,19 @@ fun CasesScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(
+                                            PrivacyMaskText(
                                                 text = if (linkItem.groupName.isNotBlank()) "[${linkItem.groupName}] ${linkItem.title.ifBlank { linkItem.url }}" else linkItem.title.ifBlank { linkItem.url },
+                                                isMasked = isPrivacyMasked,
                                                 color = TextPrimary,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Medium
                                             )
-                                            Text(linkItem.url, color = CyberPrimaryLight, fontSize = 10.sp)
+                                            PrivacyMaskText(
+                                                text = linkItem.url,
+                                                isMasked = isPrivacyMasked,
+                                                color = CyberPrimaryLight,
+                                                fontSize = 10.sp
+                                            )
                                         }
                                         Row {
                                             IconButton(
@@ -739,7 +758,7 @@ fun CasesScreen(
                             Column {
                                 Text("السعر المتفق عليه", color = TextSecondary, fontSize = 11.sp)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("${currentCase.totalAmount} ${currentCase.currency}", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    PrivacyMaskText("${currentCase.totalAmount} ${currentCase.currency}", isMasked = isPrivacyMasked, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                     IconButton(
                                         onClick = { caseForPriceUpdate = currentCase },
                                         modifier = Modifier.size(24.dp)
@@ -751,13 +770,14 @@ fun CasesScreen(
 
                             Column {
                                 Text("المبلغ المدفوع", color = TextSecondary, fontSize = 11.sp)
-                                Text("${currentCase.paidAmount} ${currentCase.currency}", color = CyberSuccess, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                PrivacyMaskText("${currentCase.paidAmount} ${currentCase.currency}", isMasked = isPrivacyMasked, color = CyberSuccess, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
 
                             Column(horizontalAlignment = Alignment.End) {
                                 Text("المتبقي", color = TextSecondary, fontSize = 11.sp)
-                                Text(
-                                    "${currentCase.remainingAmount} ${currentCase.currency}",
+                                PrivacyMaskText(
+                                    text = "${currentCase.remainingAmount} ${currentCase.currency}",
+                                    isMasked = isPrivacyMasked,
                                     color = if (currentCase.remainingAmount > 0) CyberWarning else CyberSuccess,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
@@ -786,7 +806,8 @@ fun CasesScreen(
                 CasePaymentsSection(
                     payments = casePayments,
                     onAddPaymentClick = { caseForPayment = currentCase },
-                    currency = currentCase.currency
+                    currency = currentCase.currency,
+                    isMasked = isPrivacyMasked
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -803,8 +824,19 @@ fun CasesScreen(
                     ) {
                         Column {
                             Text("العميل / صاحب الطلب:", color = TextSecondary, fontSize = 11.sp)
-                            Text(currentCase.clientName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(currentCase.clientPhone, color = CyberPrimaryLight, fontSize = 12.sp)
+                            PrivacyMaskText(
+                                text = currentCase.clientName.ifBlank { "عميل غير مسمى" },
+                                isMasked = isPrivacyMasked,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            PrivacyMaskText(
+                                text = currentCase.clientPhone.ifBlank { "—" },
+                                isMasked = isPrivacyMasked,
+                                color = CyberPrimaryLight,
+                                fontSize = 12.sp
+                            )
                             if (currentCase.source.isNotBlank()) {
                                 Text("المصدر: ${currentCase.source}", color = TextMuted, fontSize = 10.sp)
                             }
@@ -827,8 +859,9 @@ fun CasesScreen(
 
                 Text("ملاحظات المتابعة والعمل:", color = TextSecondary, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
+                PrivacyMaskText(
                     text = currentCase.notes.ifEmpty { "لا توجد ملاحظات إضافية مسجلة." },
+                    isMasked = isPrivacyMasked,
                     color = TextPrimary,
                     fontSize = 13.sp,
                     lineHeight = 20.sp
@@ -890,7 +923,12 @@ fun CasesScreen(
                                         }
                                         if (item.notes.isNotBlank()) {
                                             Spacer(modifier = Modifier.height(2.dp))
-                                            Text(text = item.notes, color = TextSecondary, fontSize = 11.sp)
+                                            PrivacyMaskText(
+                                                text = item.notes,
+                                                isMasked = isPrivacyMasked,
+                                                color = TextSecondary,
+                                                fontSize = 11.sp
+                                            )
                                         }
                                     }
                                     Row {
@@ -991,6 +1029,7 @@ fun CasesScreen(
 @Composable
 fun CaseCard(
     item: CaseEntity,
+    isMasked: Boolean,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -1051,11 +1090,20 @@ fun CaseCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "العميل: ${item.clientName}",
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "العميل: ",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                    PrivacyMaskText(
+                        text = item.clientName.ifBlank { "عميل غير مسمى" },
+                        isMasked = isMasked,
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
                 Text(
                     text = item.assignedInvestigator,
                     color = TextMuted,
@@ -1078,27 +1126,56 @@ fun CaseCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "الأتعاب: ${item.totalAmount} ${item.currency}",
-                            color = TextSecondary,
-                            fontSize = 11.sp
-                        )
-                        if (item.paidAmount > 0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "مدفوع: ${item.paidAmount}",
-                                color = CyberSuccess,
+                                text = "الأتعاب: ",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+                            PrivacyMaskText(
+                                text = "${item.totalAmount} ${item.currency}",
+                                isMasked = isMasked,
+                                color = TextPrimary,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                minBullets = 5
                             )
                         }
+                        if (item.paidAmount > 0) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "مدفوع: ",
+                                    color = CyberSuccess,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                PrivacyMaskText(
+                                    text = "${item.paidAmount}",
+                                    isMasked = isMasked,
+                                    color = CyberSuccess,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    minBullets = 4
+                                )
+                            }
+                        }
                         if (item.remainingAmount > 0) {
-                            Text(
-                                text = "متبقي: ${item.remainingAmount}",
-                                color = CyberWarning,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "متبقي: ",
+                                    color = CyberWarning,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                PrivacyMaskText(
+                                    text = "${item.remainingAmount}",
+                                    isMasked = isMasked,
+                                    color = CyberWarning,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    minBullets = 4
+                                )
+                            }
                         }
                     }
 

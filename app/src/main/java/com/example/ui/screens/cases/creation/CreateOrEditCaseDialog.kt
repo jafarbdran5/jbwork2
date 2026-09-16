@@ -42,6 +42,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,8 +51,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.data.local.entities.CaseEntity
+import com.example.ui.components.PrivacyMaskText
+import com.example.ui.components.PrivacyMaskToggle
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.ForensicViewModel
 import kotlinx.coroutines.Dispatchers
@@ -71,6 +76,7 @@ fun CreateOrEditCaseDialog(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val isEditing = existingCase != null
+    val isPrivacyMasked by viewModel.isPrivacyMasked.collectAsStateWithLifecycle()
 
     // 1. Auto-generated or existing internal case number
     val internalCaseNumber = remember {
@@ -426,8 +432,14 @@ fun CreateOrEditCaseDialog(
                                     )
                                 }
                             }
-                            IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "إلغاء", tint = TextMuted)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                PrivacyMaskToggle(
+                                    isMasked = isPrivacyMasked,
+                                    onToggle = { viewModel.togglePrivacyMasking() }
+                                )
+                                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.Close, contentDescription = "إلغاء", tint = TextMuted)
+                                }
                             }
                         }
 
@@ -607,6 +619,7 @@ fun CreateOrEditCaseDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .testTag("client_name_input"),
+                                    visualTransformation = if (isPrivacyMasked && formClientName.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                                     singleLine = true
                                 )
 
@@ -617,6 +630,7 @@ fun CreateOrEditCaseDialog(
                                     placeholder = { Text("+966...", fontSize = 12.sp) },
                                     modifier = Modifier.fillMaxWidth(),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                    visualTransformation = if (isPrivacyMasked && formClientPhone.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                                     singleLine = true
                                 )
 
@@ -627,6 +641,7 @@ fun CreateOrEditCaseDialog(
                                     placeholder = { Text("client@example.com", fontSize = 12.sp) },
                                     modifier = Modifier.fillMaxWidth(),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                    visualTransformation = if (isPrivacyMasked && formClientEmail.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                                     singleLine = true
                                 )
                             }
@@ -704,6 +719,7 @@ fun CreateOrEditCaseDialog(
                                         standaloneLinks.forEach { link ->
                                             LinkCardItem(
                                                 link = link,
+                                                isMasked = isPrivacyMasked,
                                                 onOpen = { openUrlInBrowser(context, link.url) },
                                                 onCopy = { copyToClipboard(context, link.url, "تم نسخ الرابط") },
                                                 onEdit = {
@@ -726,6 +742,7 @@ fun CreateOrEditCaseDialog(
                                         LinkGroupContainer(
                                             groupName = groupName,
                                             links = linksInGroup,
+                                            isMasked = isPrivacyMasked,
                                             onAddLinkToGroup = {
                                                 editingLinkTarget = null
                                                 defaultGroupForNewLink = groupName
@@ -759,6 +776,7 @@ fun CreateOrEditCaseDialog(
                                         customIdentifiers.forEach { idItem ->
                                             IdentifierCardItem(
                                                 item = idItem,
+                                                isMasked = isPrivacyMasked,
                                                 onCopy = { copyToClipboard(context, idItem.value, "تم نسخ المعرف") },
                                                 onEdit = {
                                                     editingIdentifierTarget = idItem
@@ -816,6 +834,7 @@ fun CreateOrEditCaseDialog(
                                         placeholder = { Text("case-$internalCaseNumber@internal.gov", fontSize = 12.sp) },
                                         modifier = Modifier.fillMaxWidth(),
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                        visualTransformation = if (isPrivacyMasked && internalCaseEmail.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                                         singleLine = true
                                     )
 
@@ -914,6 +933,7 @@ fun CreateOrEditCaseDialog(
                                         draftImages.forEachIndexed { index, img ->
                                             DraftImageItemCard(
                                                 image = img,
+                                                isMasked = isPrivacyMasked,
                                                 onPreview = { previewingImage = img },
                                                 onDownload = { exportImageDirectly(img) },
                                                 onEdit = { editingImageTarget = img },
@@ -952,6 +972,7 @@ fun CreateOrEditCaseDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(90.dp),
+                                    visualTransformation = if (isPrivacyMasked && formDescription.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                                     maxLines = 4
                                 )
 
@@ -962,6 +983,7 @@ fun CreateOrEditCaseDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(80.dp),
+                                    visualTransformation = if (isPrivacyMasked && formNotes.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                                     maxLines = 3
                                 )
 
@@ -976,6 +998,7 @@ fun CreateOrEditCaseDialog(
                                         placeholder = { Text("0.0", fontSize = 12.sp) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         modifier = Modifier.weight(1.5f),
+                                        visualTransformation = if (isPrivacyMasked && formTotalPrice.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                                         singleLine = true
                                     )
 
@@ -1060,6 +1083,7 @@ fun CreateOrEditCaseDialog(
         AddEditLinkDialog(
             existing = editingLinkTarget,
             initialGroupName = defaultGroupForNewLink,
+            isMasked = isPrivacyMasked,
             onDismiss = { showAddLinkDialog = false },
             onSave = { link ->
                 val list = customLinks.toMutableList()
@@ -1104,6 +1128,7 @@ fun CreateOrEditCaseDialog(
     if (showAddIdentifierDialog) {
         AddEditIdentifierDialog(
             existing = editingIdentifierTarget,
+            isMasked = isPrivacyMasked,
             onDismiss = { showAddIdentifierDialog = false },
             onSave = { item ->
                 val list = customIdentifiers.toMutableList()
@@ -1246,6 +1271,7 @@ private fun SectionContainer(
 @Composable
 private fun LinkCardItem(
     link: DraftCustomLink,
+    isMasked: Boolean = false,
     onOpen: () -> Unit,
     onCopy: () -> Unit,
     onEdit: () -> Unit,
@@ -1265,16 +1291,18 @@ private fun LinkCardItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
+                PrivacyMaskText(
                     text = link.title.ifBlank { link.url },
+                    isMasked = isMasked,
                     color = TextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
+                PrivacyMaskText(
                     text = link.url,
+                    isMasked = isMasked,
                     color = CyberPrimaryLight,
                     fontSize = 10.sp,
                     maxLines = 1,
@@ -1304,6 +1332,7 @@ private fun LinkCardItem(
 private fun LinkGroupContainer(
     groupName: String,
     links: List<DraftCustomLink>,
+    isMasked: Boolean = false,
     onAddLinkToGroup: () -> Unit,
     onEditGroupName: () -> Unit,
     onDeleteGroup: () -> Unit,
@@ -1356,6 +1385,7 @@ private fun LinkGroupContainer(
                 links.forEach { link ->
                     LinkCardItem(
                         link = link,
+                        isMasked = isMasked,
                         onOpen = { onOpenLink(link) },
                         onCopy = { onCopyLink(link) },
                         onEdit = { onEditLink(link) },
@@ -1370,6 +1400,7 @@ private fun LinkGroupContainer(
 @Composable
 private fun IdentifierCardItem(
     item: DraftIdentifier,
+    isMasked: Boolean = false,
     onCopy: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -1397,8 +1428,9 @@ private fun IdentifierCardItem(
                     Text(item.type, color = CyberSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
+                PrivacyMaskText(
                     text = item.value,
+                    isMasked = isMasked,
                     color = TextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -1425,6 +1457,7 @@ private fun IdentifierCardItem(
 @Composable
 private fun DraftImageItemCard(
     image: DraftCaseImage,
+    isMasked: Boolean = false,
     onPreview: () -> Unit,
     onDownload: () -> Unit,
     onEdit: () -> Unit,
@@ -1466,8 +1499,9 @@ private fun DraftImageItemCard(
 
             // Info
             Column(modifier = Modifier.weight(1f)) {
-                Text(
+                PrivacyMaskText(
                     text = image.displayName,
+                    isMasked = isMasked,
                     color = TextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -1575,6 +1609,7 @@ private fun DraftImageItemCard(
 private fun AddEditLinkDialog(
     existing: DraftCustomLink?,
     initialGroupName: String = "",
+    isMasked: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (DraftCustomLink) -> Unit
 ) {
@@ -1601,6 +1636,7 @@ private fun AddEditLinkDialog(
                     label = { Text("عنوان أو تسمية الرابط (اختياري)", fontSize = 11.sp) },
                     placeholder = { Text("مثال: حساب إنستغرام المستهدف", fontSize = 11.sp) },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && title.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     singleLine = true
                 )
 
@@ -1610,6 +1646,7 @@ private fun AddEditLinkDialog(
                     label = { Text("الرابط (URL)*", fontSize = 11.sp) },
                     placeholder = { Text("https://...", fontSize = 11.sp) },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && url.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     singleLine = true
                 )
 
@@ -1708,6 +1745,7 @@ private fun AddEditGroupDialog(
 @Composable
 private fun AddEditIdentifierDialog(
     existing: DraftIdentifier?,
+    isMasked: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (DraftIdentifier) -> Unit
 ) {
@@ -1781,6 +1819,7 @@ private fun AddEditIdentifierDialog(
                     label = { Text("قيمة المعرف*", fontSize = 11.sp) },
                     placeholder = { Text("اكتب الرقم أو الرمز أو المعرف هنا...", fontSize = 11.sp) },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && value.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     singleLine = true
                 )
             }

@@ -102,6 +102,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.CyberBadge
 import com.example.ui.components.HudType
 import com.example.ui.components.NonBlockingHudOverlay
+import com.example.ui.components.PrivacyMaskToggle
 import com.example.ui.screens.admin.AdminDashboardScreen
 import com.example.ui.screens.cases.CasesScreen
 import com.example.ui.screens.clients.ClientsScreen
@@ -190,6 +191,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     val topBarTitle by viewModel.topBarTitle.collectAsStateWithLifecycle()
                     val topBarSubtitle by viewModel.topBarSubtitle.collectAsStateWithLifecycle()
                     val isGlobalTopBarVisible by viewModel.isGlobalTopBarVisible.collectAsStateWithLifecycle()
+                    val isPrivacyMasked by viewModel.isPrivacyMasked.collectAsStateWithLifecycle()
 
                     val isAuthorizedAdmin = isAdminModeActive || currentRole.contains("جعفر بدران") || currentRole.contains("مدير")
 
@@ -397,6 +399,12 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                                     }
                                                 },
                                                 actions = {
+                                                    // Privacy Mask Toggle (Eye Icon)
+                                                    PrivacyMaskToggle(
+                                                        isMasked = isPrivacyMasked,
+                                                        onToggle = { viewModel.togglePrivacyMasking() }
+                                                    )
+
                                                     // Search button
                                                     IconButton(onClick = { currentScreen = ScreenDestination.SEARCH.id }) {
                                                         Icon(

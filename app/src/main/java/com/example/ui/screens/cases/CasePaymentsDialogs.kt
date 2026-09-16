@@ -44,12 +44,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.entities.CaseAuditLogEntity
 import com.example.data.local.entities.CaseEntity
 import com.example.data.local.entities.CasePaymentEntity
 import com.example.ui.components.CyberBadge
+import com.example.ui.components.PrivacyMaskText
 import com.example.ui.theme.CyberBorder
 import com.example.ui.theme.CyberCardElevated
 import com.example.ui.theme.CyberDanger
@@ -95,6 +98,7 @@ fun PaymentStatusBadge(status: String, modifier: Modifier = Modifier) {
 @Composable
 fun AddPaymentDialog(
     caseEntity: CaseEntity,
+    isMasked: Boolean = false,
     onDismiss: () -> Unit,
     onConfirmPayment: (amount: Double, method: String, date: String, notes: String, receipt: String) -> Unit
 ) {
@@ -118,7 +122,15 @@ fun AddPaymentDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text("تسجيل دفعة مالية جديدة", color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                    Text("القضية: ${caseEntity.caseNumber} - ${caseEntity.clientName}", color = TextSecondary, fontSize = 12.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("القضية: ${caseEntity.caseNumber} - ", color = TextSecondary, fontSize = 12.sp)
+                        PrivacyMaskText(
+                            text = caseEntity.clientName.ifBlank { "عميل" },
+                            isMasked = isMasked,
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         },
@@ -144,12 +156,19 @@ fun AddPaymentDialog(
                     ) {
                         Column {
                             Text("المبلغ الإجمالي المتفق عليه", color = TextSecondary, fontSize = 11.sp)
-                            Text("${caseEntity.totalAmount} ${caseEntity.currency}", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            PrivacyMaskText(
+                                text = "${caseEntity.totalAmount} ${caseEntity.currency}",
+                                isMasked = isMasked,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text("المتبقي حالياً", color = TextSecondary, fontSize = 11.sp)
-                            Text(
-                                "${caseEntity.remainingAmount} ${caseEntity.currency}",
+                            PrivacyMaskText(
+                                text = "${caseEntity.remainingAmount} ${caseEntity.currency}",
+                                isMasked = isMasked,
                                 color = if (caseEntity.remainingAmount > 0) CyberWarning else CyberSuccess,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
@@ -172,6 +191,7 @@ fun AddPaymentDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("payment_amount_input"),
+                    visualTransformation = if (isMasked && amountText.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = CyberSuccess,
                         unfocusedBorderColor = CyberBorder,
@@ -235,6 +255,7 @@ fun AddPaymentDialog(
                     label = { Text("رقم الإيصال / الحوالة (اختياري)") },
                     placeholder = { Text("مثال: TRX-98231") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && receiptNumber.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = CyberPrimary,
                         unfocusedBorderColor = CyberBorder,
@@ -268,6 +289,7 @@ fun AddPaymentDialog(
                     label = { Text("ملاحظات الدفعة") },
                     placeholder = { Text("دفعة أولى عند توقيع العقد، أو سداد نهائي...") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && notes.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = CyberPrimary,
                         unfocusedBorderColor = CyberBorder,
@@ -307,6 +329,7 @@ fun AddPaymentDialog(
 @Composable
 fun UpdateCasePriceDialog(
     caseEntity: CaseEntity,
+    isMasked: Boolean = false,
     onDismiss: () -> Unit,
     onConfirmUpdate: (newPrice: Double, notes: String) -> Unit
 ) {
@@ -339,11 +362,23 @@ fun UpdateCasePriceDialog(
                         .background(CyberCardElevated)
                         .padding(10.dp)
                 ) {
-                    Text(
-                        text = "السعر الحالي: ${caseEntity.totalAmount} ${caseEntity.currency} (المدفوع: ${caseEntity.paidAmount})",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("السعر الحالي: ", color = TextSecondary, fontSize = 12.sp)
+                        PrivacyMaskText(
+                            text = "${caseEntity.totalAmount} ${caseEntity.currency}",
+                            isMasked = isMasked,
+                            color = TextPrimary,
+                            fontSize = 12.sp
+                        )
+                        Text(" (المدفوع: ", color = TextSecondary, fontSize = 12.sp)
+                        PrivacyMaskText(
+                            text = "${caseEntity.paidAmount}",
+                            isMasked = isMasked,
+                            color = CyberSuccess,
+                            fontSize = 12.sp
+                        )
+                        Text(")", color = TextSecondary, fontSize = 12.sp)
+                    }
                 }
 
                 OutlinedTextField(
@@ -356,6 +391,7 @@ fun UpdateCasePriceDialog(
                     isError = errorMessage != null,
                     supportingText = errorMessage?.let { { Text(it, color = CyberDanger) } },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && newPriceText.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = CyberPrimary,
                         unfocusedBorderColor = CyberBorder,
@@ -372,6 +408,7 @@ fun UpdateCasePriceDialog(
                     label = { Text("سبب التعديل (مطلوب للتوثيق)") },
                     placeholder = { Text("اتفاق مع العميل على تخفيض/زيادة نطاق العمل...") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && updateNotes.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = CyberPrimary,
                         unfocusedBorderColor = CyberBorder,
@@ -415,7 +452,8 @@ fun UpdateCasePriceDialog(
 fun CasePaymentsSection(
     payments: List<CasePaymentEntity>,
     onAddPaymentClick: () -> Unit,
-    currency: String
+    currency: String,
+    isMasked: Boolean = false
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -468,8 +506,9 @@ fun CasePaymentsSection(
                         ) {
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
+                                    PrivacyMaskText(
                                         text = "+${pay.amount} ${pay.currency}",
+                                        isMasked = isMasked,
                                         color = CyberSuccess,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
@@ -478,10 +517,23 @@ fun CasePaymentsSection(
                                     CyberBadge(text = pay.paymentMethod, accentColor = CyberInfo)
                                 }
                                 if (pay.receiptNumber.isNotBlank()) {
-                                    Text("إيصال: ${pay.receiptNumber}", color = TextSecondary, fontSize = 11.sp)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("إيصال: ", color = TextSecondary, fontSize = 11.sp)
+                                        PrivacyMaskText(
+                                            text = pay.receiptNumber,
+                                            isMasked = isMasked,
+                                            color = TextSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                 }
                                 if (pay.notes.isNotBlank()) {
-                                    Text(pay.notes, color = TextMuted, fontSize = 11.sp)
+                                    PrivacyMaskText(
+                                        text = pay.notes,
+                                        isMasked = isMasked,
+                                        color = TextMuted,
+                                        fontSize = 11.sp
+                                    )
                                 }
                             }
                             Text(pay.paymentDate, color = TextSecondary, fontSize = 11.sp)

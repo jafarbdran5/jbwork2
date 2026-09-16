@@ -109,6 +109,10 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     private val _isScreenshotProtection = MutableStateFlow(false)
     val isScreenshotProtection = _isScreenshotProtection.asStateFlow()
 
+    // Privacy Masking (Eye Toggle Mode: Zero-CLS bullet redaction for sensitive fields)
+    private val _isPrivacyMasked = MutableStateFlow(false)
+    val isPrivacyMasked = _isPrivacyMasked.asStateFlow()
+
     // Language Toggle: "ar" or "en"
     private val _currentLanguage = MutableStateFlow("ar")
     val currentLanguage = _currentLanguage.asStateFlow()
@@ -289,6 +293,10 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
             val savedSec = repository.getSetting("screenshot_protection")
             if (savedSec != null) {
                 _isScreenshotProtection.value = (savedSec == "true")
+            }
+            val savedPrivacyMask = repository.getSetting("privacy_mask_mode")
+            if (savedPrivacyMask != null) {
+                _isPrivacyMasked.value = (savedPrivacyMask == "true")
             }
             val savedLock = repository.getSetting("security_lock_enabled")
             if (savedLock != null) {
@@ -1478,6 +1486,17 @@ $sectionNumber التوصية الفنية والإجرائية:
         }
         showHud(
             if (_isScreenshotProtection.value) "تم تفعيل حماية لقطات الشاشة (Anti-Screenshot)" else "تم تعطيل حماية لقطات الشاشة",
+            HudType.INFO
+        )
+    }
+
+    fun togglePrivacyMasking() {
+        _isPrivacyMasked.value = !_isPrivacyMasked.value
+        viewModelScope.launch {
+            repository.saveSetting("privacy_mask_mode", _isPrivacyMasked.value.toString())
+        }
+        showHud(
+            if (_isPrivacyMasked.value) "تم تفعيل وضع الخصوصية وتعتيم البيانات (Eye Mode)" else "تم تعطيل وضع الخصوصية وإظهار البيانات الحساسة",
             HudType.INFO
         )
     }

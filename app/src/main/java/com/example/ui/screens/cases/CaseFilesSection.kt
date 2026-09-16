@@ -41,6 +41,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,6 +55,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.local.entities.EvidenceEntity
 import com.example.ui.components.CyberBadge
+import com.example.ui.components.PrivacyMaskText
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.ForensicViewModel
 import kotlinx.coroutines.Dispatchers
@@ -80,6 +83,7 @@ fun CaseFilesSection(
     val activeFiles by viewModel.getEvidenceForCase(caseId).collectAsStateWithLifecycle(initialValue = emptyList())
     val trashFiles by viewModel.getDeletedEvidenceForCase(caseId).collectAsStateWithLifecycle(initialValue = emptyList())
     val configuredCategories by viewModel.caseFileCategories.collectAsStateWithLifecycle()
+    val isPrivacyMasked by viewModel.isPrivacyMasked.collectAsStateWithLifecycle()
 
     var showTrashDialog by remember { mutableStateOf(false) }
     var selectedFileForDetails by remember { mutableStateOf<EvidenceEntity?>(null) }
@@ -474,6 +478,7 @@ fun CaseFilesSection(
                     filteredFiles.forEach { file ->
                         CaseFileItemCard(
                             file = file,
+                            isMasked = isPrivacyMasked,
                             onImageThumbnailClick = {
                                 if (file.mimeType.startsWith("image/") || file.fileType.contains("صورة")) {
                                     selectedImageForPreview = file
@@ -694,6 +699,7 @@ fun CaseFilesSection(
     if (selectedFileForDetails != null) {
         CaseFileDetailsDialog(
             file = selectedFileForDetails!!,
+            isMasked = isPrivacyMasked,
             onDismiss = { selectedFileForDetails = null },
             onShare = { shareCaseFile(context, selectedFileForDetails!!) },
             onOpen = { openCaseFile(context, selectedFileForDetails!!) },
@@ -711,6 +717,7 @@ fun CaseFilesSection(
         CaseFileEditDialog(
             file = selectedFileForEdit!!,
             categories = configuredCategories,
+            isMasked = isPrivacyMasked,
             onDismiss = { selectedFileForEdit = null },
             onSave = { newName, newCategory, newDesc, newNotes ->
                 viewModel.updateCaseFileMetadata(
@@ -732,8 +739,9 @@ fun CaseFilesSection(
             onDismissRequest = { fileToDeleteConfirm = null },
             title = { Text("نقل الملف إلى سلة المحذوفات", fontWeight = FontWeight.Bold) },
             text = {
+                val displayName = if (isPrivacyMasked) "••••••••" else target.evidenceName
                 Text(
-                    text = "هل ترغب في حذف الملف «${target.evidenceName}» من القضية؟\n\nسيتم نقله إلى سلة محذوفات القضية مع إمكانية استعادته في أي وقت."
+                    text = "هل ترغب في حذف الملف «$displayName» من القضية؟\n\nسيتم نقله إلى سلة محذوفات القضية مع إمكانية استعادته في أي وقت."
                 )
             },
             confirmButton = {
@@ -759,6 +767,7 @@ fun CaseFilesSection(
     if (showTrashDialog) {
         CaseFileTrashDialog(
             trashFiles = trashFiles,
+            isMasked = isPrivacyMasked,
             onDismiss = { showTrashDialog = false },
             onRestore = { file -> viewModel.restoreCaseFile(file.id, file.evidenceName) },
             onPermanentDelete = { file -> viewModel.permanentlyDeleteCaseFile(file.id, file.evidenceName, file.localFilePath) }
@@ -771,6 +780,7 @@ fun CaseFilesSection(
             caseId = caseId,
             caseNumber = caseNumber,
             categories = configuredCategories,
+            isMasked = isPrivacyMasked,
             onDismiss = { showManualAddDialog = false },
             onSave = { name, category, type, description, hash, notes ->
                 viewModel.attachCaseOfflineFile(
@@ -802,6 +812,7 @@ fun CaseFilesSection(
 @Composable
 private fun CaseFileItemCard(
     file: EvidenceEntity,
+    isMasked: Boolean,
     onImageThumbnailClick: () -> Unit,
     onOpenClick: () -> Unit,
     onShareClick: () -> Unit,
@@ -877,13 +888,13 @@ private fun CaseFileItemCard(
 
                     // Center Details
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
+                        PrivacyMaskText(
                             text = file.evidenceName,
+                            isMasked = isMasked,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary,
                             fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            maxLines = 1
                         )
 
                         Spacer(modifier = Modifier.height(2.dp))
@@ -913,12 +924,12 @@ private fun CaseFileItemCard(
 
                         if (file.description.isNotBlank()) {
                             Spacer(modifier = Modifier.height(3.dp))
-                            Text(
+                            PrivacyMaskText(
                                 text = file.description,
+                                isMasked = isMasked,
                                 color = TextMuted,
                                 fontSize = 10.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                maxLines = 1
                             )
                         }
 
@@ -926,10 +937,16 @@ private fun CaseFileItemCard(
                             Spacer(modifier = Modifier.height(2.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "SHA256: ${file.sha256Hash.take(12)}...",
+                                    text = "SHA256: ",
                                     color = TextMuted,
                                     fontSize = 9.sp,
                                     fontFamily = FontFamily.Monospace
+                                )
+                                PrivacyMaskText(
+                                    text = "${file.sha256Hash.take(12)}...",
+                                    isMasked = isMasked,
+                                    color = TextMuted,
+                                    fontSize = 9.sp
                                 )
                                 IconButton(
                                     onClick = {
@@ -1047,6 +1064,7 @@ private fun CaseFileItemCard(
 @Composable
 private fun CaseFileDetailsDialog(
     file: EvidenceEntity,
+    isMasked: Boolean = false,
     onDismiss: () -> Unit,
     onShare: () -> Unit,
     onOpen: () -> Unit,
@@ -1087,19 +1105,19 @@ private fun CaseFileDetailsDialog(
                     verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     DetailRow("رقم القضية:", file.caseNumber)
-                    DetailRow("اسم الملف:", file.evidenceName)
-                    DetailRow("الاسم الأصلي للجهاز:", file.originalFilename)
+                    DetailRow("اسم الملف:", file.evidenceName, isMasked = isMasked)
+                    DetailRow("الاسم الأصلي للجهاز:", file.originalFilename, isMasked = isMasked)
                     DetailRow("تصنيف الملف:", file.category.ifBlank { "مستندات" })
                     DetailRow("النوع التقني:", file.fileType)
                     DetailRow("الحجم:", "${file.fileSizeFormatted} (${file.fileSizeBytes} بايت)")
                     DetailRow("تاريخ ووقت الإضافة:", formattedDate)
 
                     if (file.description.isNotBlank()) {
-                        DetailRow("وصف الملف:", file.description)
+                        DetailRow("وصف الملف:", file.description, isMasked = isMasked)
                     }
 
                     if (file.notes.isNotBlank()) {
-                        DetailRow("ملاحظات الفاحص:", file.notes)
+                        DetailRow("ملاحظات الفاحص:", file.notes, isMasked = isMasked)
                     }
 
                     DetailRow("نوع الوسيط (MIME):", file.mimeType.ifEmpty { "application/octet-stream" })
@@ -1123,24 +1141,29 @@ private fun CaseFileDetailsDialog(
                                 Text("نسخ", fontSize = 11.sp, color = CyberPrimaryLight)
                             }
                         }
-                        Text(
-                            text = file.sha256Hash.ifEmpty { "غير متوفرة" },
-                            color = TextPrimary,
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(CyberCardElevated, RoundedCornerShape(6.dp))
                                 .padding(6.dp)
-                        )
+                        ) {
+                            PrivacyMaskText(
+                                text = file.sha256Hash.ifEmpty { "غير متوفرة" },
+                                isMasked = isMasked,
+                                color = TextPrimary,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                minBullets = 12
+                            )
+                        }
                     }
 
                     if (file.md5Hash.isNotBlank()) {
-                        DetailRow("بصمة MD5:", file.md5Hash)
+                        DetailRow("بصمة MD5:", file.md5Hash, isMasked = isMasked)
                     }
 
                     if (file.localFilePath.isNotBlank()) {
-                        DetailRow("مسار التخزين المحلي:", file.localFilePath)
+                        DetailRow("مسار التخزين المحلي:", file.localFilePath, isMasked = isMasked)
                     }
 
                     DetailRow("حالة التوثيق والمزامنة:", file.syncStatus)
@@ -1224,6 +1247,7 @@ private fun CaseFileDetailsDialog(
 private fun CaseFileEditDialog(
     file: EvidenceEntity,
     categories: List<String>,
+    isMasked: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (name: String, category: String, desc: String, notes: String) -> Unit
 ) {
@@ -1255,6 +1279,7 @@ private fun CaseFileEditDialog(
                     onValueChange = { name = it },
                     label = { Text("اسم الملف *") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && name.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     singleLine = true
                 )
 
@@ -1290,6 +1315,7 @@ private fun CaseFileEditDialog(
                     onValueChange = { description = it },
                     label = { Text("وصف الملف ومحتواه") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && description.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     maxLines = 2
                 )
 
@@ -1300,6 +1326,7 @@ private fun CaseFileEditDialog(
                     onValueChange = { notes = it },
                     label = { Text("ملاحظات إضافية") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && notes.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     maxLines = 2
                 )
 
@@ -1343,6 +1370,7 @@ private fun CaseFileEditDialog(
 @Composable
 private fun CaseFileTrashDialog(
     trashFiles: List<EvidenceEntity>,
+    isMasked: Boolean = false,
     onDismiss: () -> Unit,
     onRestore: (EvidenceEntity) -> Unit,
     onPermanentDelete: (EvidenceEntity) -> Unit
@@ -1410,7 +1438,13 @@ private fun CaseFileTrashDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(file.evidenceName, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = TextPrimary)
+                                        PrivacyMaskText(
+                                            text = file.evidenceName,
+                                            isMasked = isMasked,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = TextPrimary
+                                        )
                                         Text("${file.fileSizeFormatted} • ${file.category} • ${file.fileType}", fontSize = 10.sp, color = TextSecondary)
                                     }
 
@@ -1451,7 +1485,10 @@ private fun CaseFileTrashDialog(
         AlertDialog(
             onDismissRequest = { fileToConfirmDelete = null },
             title = { Text("تأكيد الحذف والتطهير النهائي", fontWeight = FontWeight.Bold) },
-            text = { Text("هل أنت متأكد من الحذف النهائي للملف «${fileToConfirmDelete!!.evidenceName}»؟ سيتم حذف الملف من الذاكرة المحلية ومسحه نهائياً بدون إمكانية التراجع.") },
+            text = {
+                val displayName = if (isMasked) "••••••••" else fileToConfirmDelete!!.evidenceName
+                Text("هل أنت متأكد من الحذف النهائي للملف «$displayName»؟ سيتم حذف الملف من الذاكرة المحلية ومسحه نهائياً بدون إمكانية التراجع.")
+            },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1482,6 +1519,7 @@ private fun ManualEvidenceDialog(
     caseId: String,
     caseNumber: String,
     categories: List<String>,
+    isMasked: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (name: String, category: String, type: String, description: String, hash: String, notes: String) -> Unit
 ) {
@@ -1511,6 +1549,7 @@ private fun ManualEvidenceDialog(
                     onValueChange = { name = it },
                     label = { Text("اسم الملف / المرفق *") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && name.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     singleLine = true
                 )
 
@@ -1572,6 +1611,7 @@ private fun ManualEvidenceDialog(
                     onValueChange = { description = it },
                     label = { Text("وصف الملف ومحتواه") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && description.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     maxLines = 2
                 )
 
@@ -1582,6 +1622,7 @@ private fun ManualEvidenceDialog(
                     onValueChange = { hash = it },
                     label = { Text("بصمة SHA-256 (اختياري)") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && hash.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     singleLine = true
                 )
 
@@ -1592,6 +1633,7 @@ private fun ManualEvidenceDialog(
                     onValueChange = { notes = it },
                     label = { Text("ملاحظات إضافية") },
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (isMasked && notes.isNotEmpty()) PasswordVisualTransformation('•') else VisualTransformation.None,
                     maxLines = 2
                 )
 
@@ -1667,10 +1709,16 @@ private fun AddOptionRow(
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun DetailRow(label: String, value: String, isMasked: Boolean = false) {
     Column {
         Text(label, color = TextSecondary, fontSize = 11.sp)
-        Text(value, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        PrivacyMaskText(
+            text = value,
+            isMasked = isMasked,
+            color = TextPrimary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
