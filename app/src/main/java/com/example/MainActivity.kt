@@ -7,8 +7,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -80,6 +83,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -116,6 +120,9 @@ import com.example.ui.screens.support.SupportFormsScreen
 import com.example.ui.screens.investigation.InvestigationToolsScreen
 import com.example.ui.screens.tasks.TasksScreen
 import com.example.ui.screens.trash.TrashScreen
+import androidx.compose.ui.text.style.TextOverflow
+import com.example.ui.navigation.ScreenDestination
+import com.example.ui.screens.settings.BottomBarSettingsScreen
 import com.example.ui.theme.CyberBorder
 import com.example.ui.theme.CyberDanger
 import com.example.ui.theme.CyberPrimary
@@ -129,25 +136,6 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.ForensicViewModel
 import kotlinx.coroutines.launch
-
-enum class ScreenDestination(val id: Int, val title: String, val icon: ImageVector) {
-    DASHBOARD(0, "الرئيسية", Icons.Default.Home),
-    CASES(1, "القضايا", Icons.Default.Folder),
-    EXTERNAL_REQUESTS(14, "الطلبات الخارجية", Icons.Default.CloudDownload),
-    EVIDENCE(2, "المرفقات والملفات", Icons.Default.AttachFile),
-    TASKS(3, "المهام", Icons.Default.Assignment),
-    SUPPORT_FORMS(12, "نماذج الدعم المباشرة", Icons.Default.ContactSupport),
-    INVESTIGATION_HUB(13, "أدوات ومصادر العمل", Icons.Default.TravelExplore),
-    STUDIO(4, "استوديو المحتوى", Icons.Default.AutoAwesome),
-    CLIENTS(5, "العملاء", Icons.Default.People),
-    KNOWLEDGE(6, "الموسوعة المعرفية", Icons.Default.MenuBook),
-    REPORTS(7, "تقارير العمل والمتابعة", Icons.Default.Assessment),
-    SEARCH(8, "البحث الشامل", Icons.Default.Search),
-    TRASH(9, "سلة المحذوفات", Icons.Default.Delete),
-    SETTINGS(10, "الإعدادات والمزامنة", Icons.Default.Settings),
-    SECURITY(11, "سجل الأمان والتدقيق", Icons.Default.Security),
-    ADMIN_MANAGEMENT(15, "إدارة المنظومة", Icons.Default.AdminPanelSettings)
-}
 
 class MainActivity : androidx.fragment.app.FragmentActivity() {
 
@@ -200,20 +188,30 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     val isAdminModeActive by viewModel.isAdminModeActive.collectAsStateWithLifecycle()
                     val topBarTitle by viewModel.topBarTitle.collectAsStateWithLifecycle()
                     val topBarSubtitle by viewModel.topBarSubtitle.collectAsStateWithLifecycle()
+                    val isGlobalTopBarVisible by viewModel.isGlobalTopBarVisible.collectAsStateWithLifecycle()
 
                     val isAuthorizedAdmin = isAdminModeActive || currentRole.contains("جعفر بدران") || currentRole.contains("مدير")
 
+                    val bottomBarSettings by viewModel.bottomBarSettings.collectAsStateWithLifecycle()
+                    val visibleBottomItems by viewModel.visibleBottomBarItems.collectAsStateWithLifecycle()
+
                     var currentScreen by remember { mutableIntStateOf(ScreenDestination.DASHBOARD.id) }
+                    var hasAppliedDefaultScreen by remember { mutableStateOf(false) }
+                    var isBottomBarSettingsOpen by remember { mutableStateOf(false) }
+
+                    LaunchedEffect(bottomBarSettings.defaultDestinationId) {
+                        if (!hasAppliedDefaultScreen) {
+                            currentScreen = bottomBarSettings.defaultDestinationId
+                            hasAppliedDefaultScreen = true
+                        }
+                    }
+
                     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                     val scope = rememberCoroutineScope()
 
-                    val bottomNavItems = listOf(
-                        ScreenDestination.DASHBOARD,
-                        ScreenDestination.CASES,
-                        ScreenDestination.EVIDENCE,
-                        ScreenDestination.TASKS,
-                        ScreenDestination.STUDIO
-                    )
+                    LaunchedEffect(currentScreen) {
+                        viewModel.setGlobalTopBarVisible(true)
+                    }
 
                     val drawerItems = buildList {
                         add(ScreenDestination.DASHBOARD)
@@ -344,125 +342,150 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                         }
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
-                            Scaffold(
+                            if (isBottomBarSettingsOpen) {
+                                BottomBarSettingsScreen(
+                                    viewModel = viewModel,
+                                    onNavigateBack = { isBottomBarSettingsOpen = false }
+                                )
+                            } else {
+                                Scaffold(
                                 modifier = Modifier.fillMaxSize(),
                                 containerColor = MaterialTheme.colorScheme.background,
                                 topBar = {
                                     if (currentScreen != ScreenDestination.ADMIN_MANAGEMENT.id) {
-                                        TopAppBar(
-                                            title = {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                        AnimatedVisibility(
+                                            visible = isGlobalTopBarVisible,
+                                            enter = expandVertically(animationSpec = tween(200)) + fadeIn(animationSpec = tween(150)),
+                                            exit = shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(150))
+                                        ) {
+                                            TopAppBar(
+                                                title = {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        IconButton(
+                                                            onClick = { scope.launch { drawerState.open() } }
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Menu,
+                                                                contentDescription = "القائمة الجانبية",
+                                                                tint = MaterialTheme.colorScheme.onSurface
+                                                            )
+                                                        }
+
+                                                        Spacer(modifier = Modifier.width(4.dp))
+
+                                                        Column {
+                                                            Text(
+                                                                text = topBarTitle,
+                                                                color = MaterialTheme.colorScheme.onSurface,
+                                                                fontSize = 15.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                            Text(
+                                                                text = topBarSubtitle,
+                                                                color = CyberPrimaryLight,
+                                                                fontSize = 10.sp
+                                                            )
+                                                        }
+                                                    }
+                                                },
+                                                actions = {
+                                                    // Search button
+                                                    IconButton(onClick = { currentScreen = ScreenDestination.SEARCH.id }) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Search,
+                                                            contentDescription = "بحث شامل",
+                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+
+                                                    // Sync button
+                                                    IconButton(onClick = { viewModel.syncNowWithGoogleSheets() }) {
+                                                        Icon(
+                                                            imageVector = if (isCloudSyncing) Icons.Default.Refresh else Icons.Default.CloudDone,
+                                                            contentDescription = "مزامنة سحابية",
+                                                            tint = if (isCloudSyncing) CyberWarning else CyberSuccess,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+
+                                                    // Theme toggle button
+                                                    IconButton(onClick = { viewModel.toggleTheme() }) {
+                                                        Icon(
+                                                            imageVector = if (isDarkTheme) Icons.Default.Brightness4 else Icons.Default.Brightness7,
+                                                            contentDescription = "تبديل المظهر",
+                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+
+                                                    // Biometric lock button
                                                     IconButton(
-                                                        onClick = { scope.launch { drawerState.open() } }
+                                                        onClick = { viewModel.toggleBiometricLock() },
+                                                        modifier = Modifier.testTag("app_lock_button")
                                                     ) {
                                                         Icon(
-                                                            imageVector = Icons.Default.Menu,
-                                                            contentDescription = "القائمة الجانبية",
-                                                            tint = MaterialTheme.colorScheme.onSurface
+                                                            imageVector = if (isBiometricUnlocked) Icons.Default.LockOpen else Icons.Default.Lock,
+                                                            contentDescription = "قفل التطبيق",
+                                                            tint = if (isBiometricUnlocked) CyberPrimaryLight else CyberDanger,
+                                                            modifier = Modifier.size(20.dp)
                                                         )
                                                     }
-
-                                                    Spacer(modifier = Modifier.width(4.dp))
-
-                                                    Column {
-                                                        Text(
-                                                            text = topBarTitle,
-                                                            color = MaterialTheme.colorScheme.onSurface,
-                                                            fontSize = 15.sp,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                        Text(
-                                                            text = topBarSubtitle,
-                                                            color = CyberPrimaryLight,
-                                                            fontSize = 10.sp
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                            actions = {
-                                                // Search button
-                                                IconButton(onClick = { currentScreen = ScreenDestination.SEARCH.id }) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Search,
-                                                        contentDescription = "بحث شامل",
-                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
-                                                }
-
-                                                // Sync button
-                                                IconButton(onClick = { viewModel.syncNowWithGoogleSheets() }) {
-                                                    Icon(
-                                                        imageVector = if (isCloudSyncing) Icons.Default.Refresh else Icons.Default.CloudDone,
-                                                        contentDescription = "مزامنة سحابية",
-                                                        tint = if (isCloudSyncing) CyberWarning else CyberSuccess,
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
-                                                }
-
-                                                // Theme toggle button
-                                                IconButton(onClick = { viewModel.toggleTheme() }) {
-                                                    Icon(
-                                                        imageVector = if (isDarkTheme) Icons.Default.Brightness4 else Icons.Default.Brightness7,
-                                                        contentDescription = "تبديل المظهر",
-                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
-                                                }
-
-                                                // Biometric lock button
-                                                IconButton(
-                                                    onClick = { viewModel.toggleBiometricLock() },
-                                                    modifier = Modifier.testTag("app_lock_button")
-                                                ) {
-                                                    Icon(
-                                                        imageVector = if (isBiometricUnlocked) Icons.Default.LockOpen else Icons.Default.Lock,
-                                                        contentDescription = "قفل التطبيق",
-                                                        tint = if (isBiometricUnlocked) CyberPrimaryLight else CyberDanger,
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
-                                                }
-                                            },
-                                            colors = TopAppBarDefaults.topAppBarColors(
-                                                containerColor = MaterialTheme.colorScheme.surface
+                                                },
+                                                colors = TopAppBarDefaults.topAppBarColors(
+                                                    containerColor = MaterialTheme.colorScheme.surface
+                                                )
                                             )
-                                        )
+                                        }
                                     }
                                 },
                                 bottomBar = {
-                                    if (currentScreen != ScreenDestination.ADMIN_MANAGEMENT.id) {
-                                        NavigationBar(
-                                            containerColor = MaterialTheme.colorScheme.surface,
-                                            contentColor = CyberPrimary,
-                                            tonalElevation = 8.dp
+                                    if (currentScreen != ScreenDestination.ADMIN_MANAGEMENT.id &&
+                                        bottomBarSettings.isEnabled &&
+                                        visibleBottomItems.isNotEmpty()
+                                    ) {
+                                        AnimatedVisibility(
+                                            visible = isGlobalTopBarVisible,
+                                            enter = expandVertically(animationSpec = tween(200)) + fadeIn(animationSpec = tween(150)),
+                                            exit = shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(150))
                                         ) {
-                                            bottomNavItems.forEach { tab ->
-                                                val isSelected = currentScreen == tab.id
-                                                NavigationBarItem(
-                                                    selected = isSelected,
-                                                    onClick = { currentScreen = tab.id },
-                                                    icon = {
-                                                        Icon(
-                                                            imageVector = tab.icon,
-                                                            contentDescription = tab.title,
-                                                            modifier = Modifier.size(20.dp)
+                                            NavigationBar(
+                                                containerColor = MaterialTheme.colorScheme.surface,
+                                                contentColor = CyberPrimary,
+                                                tonalElevation = 8.dp
+                                            ) {
+                                                visibleBottomItems.forEach { item ->
+                                                    val destination = ScreenDestination.fromId(item.destinationId) ?: return@forEach
+                                                    val isSelected = currentScreen == destination.id
+                                                    val displayLabel = item.customTitle.ifBlank { destination.title }
+                                                    NavigationBarItem(
+                                                        selected = isSelected,
+                                                        onClick = { currentScreen = destination.id },
+                                                        icon = {
+                                                            Icon(
+                                                                imageVector = destination.icon,
+                                                                contentDescription = displayLabel,
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        },
+                                                        label = {
+                                                            Text(
+                                                                text = displayLabel,
+                                                                fontSize = 10.5.sp,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                            )
+                                                        },
+                                                        colors = NavigationBarItemDefaults.colors(
+                                                            selectedIconColor = CyberPrimaryLight,
+                                                            selectedTextColor = CyberPrimaryLight,
+                                                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            indicatorColor = CyberPrimary.copy(alpha = 0.15f)
                                                         )
-                                                    },
-                                                    label = {
-                                                        Text(
-                                                            text = tab.title,
-                                                            fontSize = 11.sp,
-                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                                        )
-                                                    },
-                                                    colors = NavigationBarItemDefaults.colors(
-                                                        selectedIconColor = CyberPrimaryLight,
-                                                        selectedTextColor = CyberPrimaryLight,
-                                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        indicatorColor = CyberPrimary.copy(alpha = 0.15f)
                                                     )
-                                                )
+                                                }
                                             }
                                         }
                                     }
@@ -519,7 +542,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                         ScreenDestination.SETTINGS.id -> SettingsScreen(
                                             viewModel = viewModel,
                                             onNavigateToTrash = { currentScreen = ScreenDestination.TRASH.id },
-                                            onNavigateToAdmin = { currentScreen = ScreenDestination.ADMIN_MANAGEMENT.id }
+                                            onNavigateToAdmin = { currentScreen = ScreenDestination.ADMIN_MANAGEMENT.id },
+                                            onNavigateToBottomBarSettings = { isBottomBarSettingsOpen = true }
                                         )
                                         ScreenDestination.SECURITY.id -> AuditAndSecurityScreen(viewModel = viewModel)
                                         ScreenDestination.ADMIN_MANAGEMENT.id -> AdminDashboardScreen(
@@ -529,6 +553,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     }
                                 }
                             }
+                        }
 
                             // Floating Non-Blocking HUD Banner
                             if (hudMessage != null) {

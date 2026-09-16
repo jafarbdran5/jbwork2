@@ -965,6 +965,8 @@ object PrepopulatedSupportForms {
             PrepopulatedSupportFormsExpanded.ADDITIONAL_FORMS +
             PrepopulatedSupportFormsExpanded2.ADDITIONAL_FORMS_PART2 +
             PrepopulatedSupportFormsExpanded3.ADDITIONAL_FORMS_PART3 +
-            PrepopulatedSupportFormsExpanded4.ADDITIONAL_FORMS_PART4
+            PrepopulatedSupportFormsExpanded4.ADDITIONAL_FORMS_PART4 +
+            PrepopulatedSupportFormsExpanded5.ADDITIONAL_FORMS_PART5 +
+            PrepopulatedSupportFormsExpanded6.ADDITIONAL_FORMS_PART6
     }
 }

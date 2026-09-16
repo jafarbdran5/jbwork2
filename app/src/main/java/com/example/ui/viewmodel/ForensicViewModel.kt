@@ -35,6 +35,10 @@ import com.example.data.local.entities.SystemExpenseEntity
 import com.example.data.local.entities.OfficialSourceEntity
 import com.example.data.local.entities.ProfitShareRuleEntity
 import com.example.data.local.entities.FinancialRevenueEntity
+import com.example.data.preferences.BottomBarDataStore
+import com.example.data.preferences.BottomBarItemConfig
+import com.example.data.preferences.BottomBarSettings
+import com.example.ui.navigation.ScreenDestination
 import com.example.data.remote.SheetReadResult
 import com.example.data.repository.ExternalRequestsRepository
 import com.example.data.repository.ForensicRepository
@@ -151,6 +155,46 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
     val videoScriptStatusFilter = MutableStateFlow("الكل")
 
     val globalSearchQuery = MutableStateFlow("")
+
+    // Dynamic Scroll Header / TopBar Visibility
+    val isGlobalTopBarVisible = MutableStateFlow(true)
+    fun setGlobalTopBarVisible(visible: Boolean) {
+        if (isGlobalTopBarVisible.value != visible) {
+            isGlobalTopBarVisible.value = visible
+        }
+    }
+
+    // Bottom Navigation Bar Customization (DataStore)
+    private val bottomBarDataStore = BottomBarDataStore(application)
+
+    val bottomBarSettings: StateFlow<BottomBarSettings> = bottomBarDataStore.settingsFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = bottomBarDataStore.getDefaultSettings()
+        )
+
+    val visibleBottomBarItems: StateFlow<List<BottomBarItemConfig>> = bottomBarSettings
+        .map { it.activeVisibleItems }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = bottomBarDataStore.getDefaultSettings().activeVisibleItems
+        )
+
+    fun saveBottomBarSettings(settings: BottomBarSettings) {
+        viewModelScope.launch {
+            bottomBarDataStore.saveSettings(settings)
+            showHud("تم حفظ تخصيص الشريط السفلي بنجاح", HudType.SUCCESS)
+        }
+    }
+
+    fun resetBottomBarSettings() {
+        viewModelScope.launch {
+            bottomBarDataStore.resetToDefault()
+            showHud("تمت استعادة الإعدادات الافتراضية للشريط السفلي", HudType.INFO)
+        }
+    }
 
     // Support Forms State & Filters
     val supportFormSearchQuery = MutableStateFlow("")
@@ -376,7 +420,7 @@ class ForensicViewModel(application: Application) : AndroidViewModel(application
                     form.category.contains(q, ignoreCase = true) ||
                     form.tags.contains(q, ignoreCase = true)
 
-            val matchesCompany = company == "الكل" || form.company.equals(company, ignoreCase = true) || form.platform.equals(company, ignoreCase = true)
+            val matchesCompany = company == "الكل" || form.company.equals(company, ignoreCase = true) || form.platform.contains(company, ignoreCase = true)
             val matchesProblem = problem == "الكل" || form.problemType.contains(problem, ignoreCase = true) || form.category.contains(problem, ignoreCase = true)
             val matchesDirect = !directOnly || (form.urlType == "DIRECT_FORM" || form.urlType == "REPORT_FORM" || form.urlType == "RECOVERY_FORM" || form.urlType == "LEGAL_FORM")
             val matchesVerified = !verifiedOnly || form.verified
@@ -1409,6 +1453,13 @@ $sectionNumber التوصية الفنية والإجرائية:
     // ==========================================
     // SUPPORT FORMS & INVESTIGATION TOOLS ACTIONS
     // ==========================================
+    fun toggleSupportFormFavorite(formId: String) {
+        val current = favoriteSupportFormIds.value
+        val isFav = current.contains(formId)
+        favoriteSupportFormIds.value = if (isFav) current - formId else current + formId
+        showHud(if (!isFav) "تمت إضافة النموذج إلى المفضلة" else "تمت إزالة النموذج من المفضلة", HudType.INFO)
+    }
+
     fun toggleToolFavorite(toolId: String, currentFavorite: Boolean) {
         viewModelScope.launch {
             repository.toggleToolFavorite(toolId, !currentFavorite)

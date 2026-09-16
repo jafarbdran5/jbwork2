@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -44,14 +47,19 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import android.content.Intent
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -80,11 +88,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entities.ContentEntity
 import com.example.data.local.entities.VideoIdeaEntity
 import com.example.data.local.entities.VideoScriptEntity
+import com.example.ui.components.CollapsibleHeaderContainer
 import com.example.ui.components.CyberBadge
 import com.example.ui.components.CyberCard
 import com.example.ui.components.HudType
 import com.example.ui.components.InAppConfirmationSheet
 import com.example.ui.components.PlatformBadge
+import com.example.ui.components.rememberScrollHeaderVisibility
 import com.example.ui.theme.CyberBg
 import com.example.ui.theme.CyberBorder
 import com.example.ui.theme.CyberCardElevated
@@ -155,6 +165,7 @@ fun ContentStudioScreen(
 
     var postToEdit by remember { mutableStateOf<ContentEntity?>(null) }
     var postToDelete by remember { mutableStateOf<ContentEntity?>(null) }
+    var selectedPostForDetails by remember { mutableStateOf<ContentEntity?>(null) }
     var showEditorSheet by remember { mutableStateOf(false) }
     var showTemplatesSheet by remember { mutableStateOf(false) }
 
@@ -201,6 +212,21 @@ fun ContentStudioScreen(
         showEditorSheet = true
     }
 
+    val postsListState = rememberLazyListState()
+    val ideasListState = rememberLazyListState()
+    val scriptsListState = rememberLazyListState()
+
+    val activeStudioListState = when (currentStudioTab) {
+        0 -> postsListState
+        1 -> ideasListState
+        else -> scriptsListState
+    }
+
+    val isHeaderVisible by rememberScrollHeaderVisibility(
+        listState = activeStudioListState,
+        onVisibilityChanged = { viewModel.setGlobalTopBarVisible(it) }
+    )
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = CyberBg,
@@ -244,97 +270,99 @@ fun ContentStudioScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Header & Studio Banner
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            // Dynamic Collapsible Header (Scroll Down -> Hide, Scroll Up -> Show)
+            CollapsibleHeaderContainer(visible = isHeaderVisible) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
                 ) {
-                    Column {
-                        Text(
-                            text = "استوديو صناعة المحتوى والفيديو",
-                            color = TextPrimary,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "صناعة المنشورات التوعوية، إدارة أفكار الفيديوهات، وكتابة الاسكربتات",
-                            color = TextSecondary,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    if (currentStudioTab == 0) {
-                        Button(
-                            onClick = { showTemplatesSheet = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = CyberSecondary.copy(alpha = 0.2f)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.testTag("open_templates_button")
-                        ) {
-                            Icon(
-                                Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = CyberSecondary,
-                                modifier = Modifier.size(16.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "استوديو صناعة المحتوى والفيديو",
+                                color = TextPrimary,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("قوالب", color = CyberSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "صناعة المنشورات التوعوية، إدارة أفكار الفيديوهات، وكتابة الاسكربتات",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+
+                        if (currentStudioTab == 0) {
+                            Button(
+                                onClick = { showTemplatesSheet = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = CyberSecondary.copy(alpha = 0.2f)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.testTag("open_templates_button")
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = CyberSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("قوالب", color = CyberSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                // STUDIO TABS ROW
-                TabRow(
-                    selectedTabIndex = currentStudioTab,
-                    containerColor = CyberSurface,
-                    contentColor = CyberPrimaryLight,
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[currentStudioTab]),
-                            color = if (currentStudioTab == 1) CyberSecondary else CyberPrimary
+                    // STUDIO TABS ROW
+                    TabRow(
+                        selectedTabIndex = currentStudioTab,
+                        containerColor = CyberSurface,
+                        contentColor = CyberPrimaryLight,
+                        indicator = { tabPositions ->
+                            TabRowDefaults.SecondaryIndicator(
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[currentStudioTab]),
+                                color = if (currentStudioTab == 1) CyberSecondary else CyberPrimary
+                            )
+                        }
+                    ) {
+                        Tab(
+                            selected = currentStudioTab == 0,
+                            onClick = { currentStudioTab = 0 },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Article, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("المنشورات (${contentList.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        )
+                        Tab(
+                            selected = currentStudioTab == 1,
+                            onClick = { currentStudioTab = 1 },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("أفكار الفيديوهات (${videoIdeas.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        )
+                        Tab(
+                            selected = currentStudioTab == 2,
+                            onClick = { currentStudioTab = 2 },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Movie, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("الاسكربتات (${videoScripts.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         )
                     }
-                ) {
-                    Tab(
-                        selected = currentStudioTab == 0,
-                        onClick = { currentStudioTab = 0 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Article, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("المنشورات (${contentList.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    )
-                    Tab(
-                        selected = currentStudioTab == 1,
-                        onClick = { currentStudioTab = 1 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("أفكار الفيديوهات (${videoIdeas.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    )
-                    Tab(
-                        selected = currentStudioTab == 2,
-                        onClick = { currentStudioTab = 2 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Movie, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("الاسكربتات (${videoScripts.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    )
                 }
             }
 
@@ -394,6 +422,7 @@ fun ContentStudioScreen(
                             }
                         } else {
                             LazyColumn(
+                                state = postsListState,
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(horizontal = 16.dp),
@@ -402,11 +431,20 @@ fun ContentStudioScreen(
                                 items(contentList, key = { it.id }) { item ->
                                     ContentPostCard(
                                         item = item,
+                                        onClick = { selectedPostForDetails = item },
                                         onCopy = {
                                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                             val clip = ClipData.newPlainText("Post Content", "${item.title}\n\n${item.body}\n\n${item.tagsJson}")
                                             clipboard.setPrimaryClip(clip)
                                             viewModel.showHud("تم نسخ المنشور للحافظة", HudType.SUCCESS)
+                                        },
+                                        onShare = {
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(Intent.EXTRA_SUBJECT, item.title)
+                                                putExtra(Intent.EXTRA_TEXT, "${item.title}\n\n${item.body}\n\n${item.tagsJson}")
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "مشاركة المنشور"))
                                         },
                                         onEdit = { openEditPost(item) },
                                         onDelete = { postToDelete = item }
@@ -440,7 +478,8 @@ fun ContentStudioScreen(
                             initialIdeaForScript = idea
                             scriptToEdit = null
                             showScriptEditorSheet = true
-                        }
+                        },
+                        listState = ideasListState
                     )
                 }
                 2 -> {
@@ -464,7 +503,8 @@ fun ContentStudioScreen(
                         },
                         onViewScriptReader = { script ->
                             scriptForReader = script
-                        }
+                        },
+                        listState = scriptsListState
                     )
                 }
             }
@@ -547,6 +587,52 @@ fun ContentStudioScreen(
                 postToDelete = null
             },
             onDismiss = { postToDelete = null }
+        )
+    }
+
+    // Post Detail Sheet
+    if (selectedPostForDetails != null) {
+        val post = selectedPostForDetails!!
+        ContentPostDetailSheet(
+            item = post,
+            onCopyAll = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Post Content", "${post.title}\n\n${post.body}\n\n${post.tagsJson}")
+                clipboard.setPrimaryClip(clip)
+                viewModel.showHud("تم نسخ المنشور بالكامل للحافظة", HudType.SUCCESS)
+            },
+            onCopyTitle = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Post Title", post.title))
+                viewModel.showHud("تم نسخ العنوان للحافظة", HudType.SUCCESS)
+            },
+            onCopyBody = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Post Body", post.body))
+                viewModel.showHud("تم نسخ نص المنشور للحافظة", HudType.SUCCESS)
+            },
+            onCopyTags = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Post Tags", post.tagsJson))
+                viewModel.showHud("تم نسخ الهاشتاجات للحافظة", HudType.SUCCESS)
+            },
+            onShare = {
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, post.title)
+                    putExtra(Intent.EXTRA_TEXT, "${post.title}\n\n${post.body}\n\n${post.tagsJson}")
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "مشاركة المنشور"))
+            },
+            onEdit = {
+                selectedPostForDetails = null
+                openEditPost(post)
+            },
+            onDelete = {
+                selectedPostForDetails = null
+                postToDelete = post
+            },
+            onDismiss = { selectedPostForDetails = null }
         )
     }
 
@@ -790,104 +876,360 @@ fun ContentStudioScreen(
 @Composable
 fun ContentPostCard(
     item: ContentEntity,
+    onClick: () -> Unit,
     onCopy: () -> Unit,
+    onShare: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    CyberCard(
-        modifier = Modifier
+    Card(
+        modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .border(1.dp, CyberBorder, RoundedCornerShape(10.dp))
             .testTag("content_card_${item.id}"),
-        backgroundColor = CyberCardElevated
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(10.dp)
     ) {
-        Column {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Header Row: Platform & Status Badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     PlatformBadge(platform = item.platform)
-                    Spacer(modifier = Modifier.width(8.dp))
                     CyberBadge(text = item.status, accentColor = CyberSecondary)
                 }
 
-                Row {
-                    // One-click copy
-                    IconButton(
-                        onClick = onCopy,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("copy_content_btn")
-                    ) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = "نسخ النص",
-                            tint = CyberPrimaryLight,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    // Edit
-                    IconButton(
-                        onClick = onEdit,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("edit_content_btn")
-                    ) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "تعديل",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    // Delete
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("delete_content_btn")
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "حذف",
-                            tint = CyberDanger.copy(alpha = 0.8f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
+                // Quick copy icon button
+                IconButton(
+                    onClick = onCopy,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .testTag("copy_content_btn")
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "نسخ النص",
+                        tint = CyberPrimaryLight,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = item.title,
-                color = TextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
-            )
-
             Spacer(modifier = Modifier.height(6.dp))
 
+            // Content Title
+            Text(
+                text = item.title,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Content Body Summary
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = item.body,
-                color = TextSecondary,
-                fontSize = 13.sp,
-                lineHeight = 19.sp,
-                maxLines = 4,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.5.sp,
+                lineHeight = 16.sp,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
 
             if (item.tagsJson.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = item.tagsJson,
                     color = CyberPrimaryLight,
-                    fontSize = 11.sp
+                    fontSize = 10.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Action Buttons Row: Clear, responsive, compact
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Details button
+                OutlinedButton(
+                    onClick = onClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp)
+                        .testTag("details_content_btn_${item.id}"),
+                    shape = RoundedCornerShape(7.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+                ) {
+                    Text(
+                        text = "فتح التفاصيل",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Share Button
+                IconButton(
+                    onClick = onShare,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .border(1.dp, CyberBorder, RoundedCornerShape(7.dp))
+                ) {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = "مشاركة",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+
+                // Edit Button
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .border(1.dp, CyberBorder, RoundedCornerShape(7.dp))
+                        .testTag("edit_content_btn")
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "تعديل",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+
+                // Delete Button
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .border(1.dp, CyberDanger.copy(alpha = 0.3f), RoundedCornerShape(7.dp))
+                        .testTag("delete_content_btn")
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "حذف",
+                        tint = CyberDanger.copy(alpha = 0.8f),
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ContentPostDetailSheet(
+    item: ContentEntity,
+    onCopyAll: () -> Unit,
+    onCopyTitle: () -> Unit,
+    onCopyBody: () -> Unit,
+    onCopyTags: () -> Unit,
+    onShare: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PlatformBadge(platform = item.platform)
+                    CyberBadge(text = item.status, accentColor = CyberSecondary)
+                }
+
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "إغلاق")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Title Field with dedicated copy button
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("عنوان المنشور", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    IconButton(onClick = onCopyTitle, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "نسخ العنوان", tint = CyberPrimaryLight, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Body Field with dedicated copy button
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("نص المنشور الكامل", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        IconButton(onClick = onCopyBody, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "نسخ النص", tint = CyberPrimaryLight, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = item.body,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // Tags Field with dedicated copy button
+            if (item.tagsJson.isNotBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("الهاشتاجات", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(item.tagsJson, fontSize = 12.sp, color = CyberPrimaryLight)
+                        }
+                        IconButton(onClick = onCopyTags, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "نسخ الهاشتاجات", tint = CyberPrimaryLight, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Copy All Button
+            Button(
+                onClick = onCopyAll,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("نسخ المنشور بالكامل (مع الهاشتاجات)", fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Action Buttons Row: Share, Edit, Delete
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        onShare()
+                    },
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("مشاركة", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        onEdit()
+                    },
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberSecondary)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, tint = CyberSecondary, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("تعديل", color = CyberSecondary, fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        onDelete()
+                    },
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberDanger.copy(alpha = 0.5f))
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = CyberDanger, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("حذف", color = CyberDanger, fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

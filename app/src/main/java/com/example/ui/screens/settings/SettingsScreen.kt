@@ -44,7 +44,9 @@ import androidx.compose.material.icons.filled.ScreenLockPortrait
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SupervisorAccount
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -97,7 +99,8 @@ import java.util.Locale
 fun SettingsScreen(
     viewModel: ForensicViewModel,
     onNavigateToTrash: () -> Unit,
-    onNavigateToAdmin: () -> Unit = {}
+    onNavigateToAdmin: () -> Unit = {},
+    onNavigateToBottomBarSettings: () -> Unit = {}
 ) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val isScreenshotProtected by viewModel.isScreenshotProtection.collectAsState()
@@ -108,7 +111,9 @@ fun SettingsScreen(
     val lastSync by viewModel.lastSyncTimestamp.collectAsState()
     val pendingSyncCount by viewModel.pendingSyncCount.collectAsState()
     val systemLogoPath by viewModel.systemLogoPath.collectAsState()
+    val bottomBarSettings by viewModel.bottomBarSettings.collectAsState()
     val context = LocalContext.current
+    var showBottomBarSettingsModal by remember { mutableStateOf(false) }
 
     val logoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -491,6 +496,109 @@ fun SettingsScreen(
             }
         }
 
+        // Interface Customization Section (تخصيص الواجهة -> الشريط السفلي)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CyberBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = CyberPrimaryLight,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "تخصيص الواجهة",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Bottom Bar Option Item
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .clickable {
+                                if (onNavigateToBottomBarSettings != {}) {
+                                    onNavigateToBottomBarSettings()
+                                } else {
+                                    showBottomBarSettingsModal = true
+                                }
+                            }
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(CyberPrimary.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ViewStream,
+                                    contentDescription = null,
+                                    tint = CyberPrimaryLight,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "الشريط السفلي (Bottom Navigation)",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (bottomBarSettings.isEnabled) {
+                                        "مُمكّن • ${bottomBarSettings.activeVisibleItems.size} أقسام معروضة • معاينة حية"
+                                    } else {
+                                        "مخفي بالكامل • انقر لإعادة الإظهار والتخصيص"
+                                    },
+                                    color = if (bottomBarSettings.isEnabled) CyberSuccess else CyberDanger,
+                                    fontSize = 11.5.sp
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(CyberPrimary.copy(alpha = 0.12f))
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = "تخصيص",
+                                color = CyberPrimaryLight,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Google Sheets Integration Section
         item {
             Card(
@@ -868,6 +976,18 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+    }
+
+    if (showBottomBarSettingsModal) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showBottomBarSettingsModal = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            BottomBarSettingsScreen(
+                viewModel = viewModel,
+                onNavigateBack = { showBottomBarSettingsModal = false }
+            )
         }
     }
 }

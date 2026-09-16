@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.example.ui.components.CollapsibleHeaderContainer
+import com.example.ui.components.rememberScrollHeaderVisibility
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +43,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -52,6 +57,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -97,6 +103,7 @@ import java.util.UUID
 val SUPPORT_COMPANIES = listOf(
     "الكل",
     "Meta",
+    "Facebook",
     "Instagram",
     "WhatsApp",
     "Google",
@@ -132,6 +139,7 @@ fun SupportFormsScreen(
 
     val forms by viewModel.filteredSupportForms.collectAsStateWithLifecycle()
     val rawCases by viewModel.rawCases.collectAsStateWithLifecycle()
+    val favoriteFormIds by viewModel.favoriteSupportFormIds.collectAsStateWithLifecycle()
 
     val searchQuery by viewModel.supportFormSearchQuery.collectAsStateWithLifecycle()
     val companyFilter by viewModel.supportFormCompanyFilter.collectAsStateWithLifecycle()
@@ -139,8 +147,20 @@ fun SupportFormsScreen(
     val directOnly by viewModel.supportFormDirectOnly.collectAsStateWithLifecycle()
     val verifiedOnly by viewModel.supportFormVerifiedOnly.collectAsStateWithLifecycle()
 
+    var favoritesOnly by remember { mutableStateOf(false) }
+    var selectedFormForDetails by remember { mutableStateOf<SupportFormEntity?>(null) }
     var selectedFormForCaseLink by remember { mutableStateOf<SupportFormEntity?>(null) }
     var showAddFormDialog by remember { mutableStateOf(false) }
+
+    val listState = rememberLazyListState()
+    val isHeaderVisible by rememberScrollHeaderVisibility(
+        listState = listState,
+        onVisibilityChanged = { viewModel.setGlobalTopBarVisible(it) }
+    )
+
+    val displayedForms = remember(forms, favoritesOnly, favoriteFormIds) {
+        if (favoritesOnly) forms.filter { favoriteFormIds.contains(it.id) } else forms
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -161,146 +181,175 @@ fun SupportFormsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Header Banner - Compact
-            SupportFormsHeader(
-                totalCount = forms.size,
-                verifiedCount = forms.count { it.verified }
-            )
+            // Dynamic Collapsible Header (Scroll Down -> Hide, Scroll Up -> Show)
+            CollapsibleHeaderContainer(visible = isHeaderVisible) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Header Banner - Compact
+                    SupportFormsHeader(
+                        totalCount = forms.size,
+                        verifiedCount = forms.count { it.verified }
+                    )
 
-            // Search Box - Compact & Responsive
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.supportFormSearchQuery.value = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .testTag("support_form_search_field"),
-                placeholder = {
-                    Text(
-                        "ابحث بالمنصة، نوع المشكلة (ابتزاز، اختراق...) أو الرابط",
-                        fontSize = 11.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "بحث",
-                        tint = CyberPrimaryLight,
-                        modifier = Modifier.size(18.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { viewModel.supportFormSearchQuery.value = "" }) {
+                    // Search Box - Compact & Responsive
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.supportFormSearchQuery.value = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .testTag("support_form_search_field"),
+                        placeholder = {
+                            Text(
+                                "ابحث بالمنصة، نوع المشكلة (ابتزاز، اختراق...) أو الرابط",
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        },
+                        leadingIcon = {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "مسح",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "بحث",
+                                tint = CyberPrimaryLight,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotBlank()) {
+                                IconButton(onClick = { viewModel.supportFormSearchQuery.value = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "مسح",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CyberPrimary,
+                            unfocusedBorderColor = CyberBorder,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                        )
+                    )
+
+                    // Horizontal Filters: Companies (Compact)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        SUPPORT_COMPANIES.forEach { company ->
+                            val isSelected = companyFilter == company
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.supportFormCompanyFilter.value = company },
+                                label = { Text(company, fontSize = 10.5.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CyberPrimary.copy(alpha = 0.2f),
+                                    selectedLabelColor = CyberPrimaryLight,
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isSelected,
+                                    borderColor = if (isSelected) CyberPrimary else CyberBorder
+                                )
                             )
                         }
                     }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = CyberPrimary,
-                    unfocusedBorderColor = CyberBorder,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                )
-            )
 
-            // Horizontal Filters: Companies (Compact)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                SUPPORT_COMPANIES.forEach { company ->
-                    val isSelected = companyFilter == company
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.supportFormCompanyFilter.value = company },
-                        label = { Text(company, fontSize = 10.5.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = CyberPrimary.copy(alpha = 0.2f),
-                            selectedLabelColor = CyberPrimaryLight,
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isSelected,
-                            borderColor = if (isSelected) CyberPrimary else CyberBorder
-                        )
-                    )
-                }
-            }
+                    // Horizontal Filters: Problem Types (Compact)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        SUPPORT_PROBLEM_TYPES.forEach { problem ->
+                            val isSelected = problemFilter == problem
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.supportFormProblemFilter.value = problem },
+                                label = { Text(problem, fontSize = 10.5.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CyberSecondary.copy(alpha = 0.2f),
+                                    selectedLabelColor = CyberSecondary,
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isSelected,
+                                    borderColor = if (isSelected) CyberSecondary else CyberBorder
+                                )
+                            )
+                        }
+                    }
 
-            // Horizontal Filters: Problem Types (Compact)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                SUPPORT_PROBLEM_TYPES.forEach { problem ->
-                    val isSelected = problemFilter == problem
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.supportFormProblemFilter.value = problem },
-                        label = { Text(problem, fontSize = 10.5.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = CyberSecondary.copy(alpha = 0.2f),
-                            selectedLabelColor = CyberSecondary,
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isSelected,
-                            borderColor = if (isSelected) CyberSecondary else CyberBorder
-                        )
-                    )
-                }
-            }
+                    // Quick Toggles Row (Compact & Functional)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Official Filter
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Verified,
+                                contentDescription = null,
+                                tint = CyberSuccess,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text("روابط رسمية فقط", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Switch(
+                                checked = verifiedOnly,
+                                onCheckedChange = { viewModel.supportFormVerifiedOnly.value = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = CyberSuccess,
+                                    checkedTrackColor = CyberSuccess.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.size(width = 40.dp, height = 24.dp)
+                            )
+                        }
 
-            // Quick Toggles Row (Compact)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Verified,
-                        contentDescription = null,
-                        tint = CyberSuccess,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Text("روابط رسمية ومتحققة فقط", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurface)
+                        // Favorites Filter
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (favoritesOnly) Icons.Default.Star else Icons.Default.StarBorder,
+                                contentDescription = null,
+                                tint = CyberWarning,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text("المفضلة (${favoriteFormIds.size})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Switch(
+                                checked = favoritesOnly,
+                                onCheckedChange = { favoritesOnly = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = CyberWarning,
+                                    checkedTrackColor = CyberWarning.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.size(width = 40.dp, height = 24.dp)
+                            )
+                        }
+                    }
                 }
-                Switch(
-                    checked = verifiedOnly,
-                    onCheckedChange = { viewModel.supportFormVerifiedOnly.value = it },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = CyberSuccess,
-                        checkedTrackColor = CyberSuccess.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier.size(width = 44.dp, height = 24.dp)
-                )
             }
 
             // Forms List
-            if (forms.isEmpty()) {
+            if (displayedForms.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -318,13 +367,13 @@ fun SupportFormsScreen(
                             modifier = Modifier.size(44.dp)
                         )
                         Text(
-                            text = "لم يتم العثور على نماذج مطابقة لبحثك",
+                            text = if (favoritesOnly) "لا توجد نماذج مضافة للمفضلة" else "لم يتم العثور على نماذج مطابقة لبحثك",
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "جرّب تغيير الفلاتر أو إزالة شروط البحث للعثور على النموذج المطلوب",
+                            text = if (favoritesOnly) "اضغط على نجمة أي نموذج لإضافته إلى قائمة المفضلة السريعة" else "جرّب تغيير الفلاتر أو إزالة شروط البحث للعثور على النموذج المطلوب",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.5.sp
                         )
@@ -332,13 +381,17 @@ fun SupportFormsScreen(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 80.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(forms, key = { it.id }) { form ->
+                    items(displayedForms, key = { it.id }) { form ->
                         SupportFormCard(
                             form = form,
+                            isFavorite = favoriteFormIds.contains(form.id),
+                            onToggleFavorite = { viewModel.toggleSupportFormFavorite(form.id) },
+                            onClick = { selectedFormForDetails = form },
                             onOpen = { viewModel.openUrl(context, form.formUrl) },
                             onCopy = { viewModel.copyToClipboard(context, form.formUrl, form.formName) },
                             onShare = { viewModel.shareUrl(context, form.formUrl, form.formName) },
@@ -347,6 +400,24 @@ fun SupportFormsScreen(
                     }
                 }
             }
+        }
+
+        // Details BottomSheet
+        if (selectedFormForDetails != null) {
+            val detailForm = selectedFormForDetails!!
+            SupportFormDetailSheet(
+                form = detailForm,
+                isFavorite = favoriteFormIds.contains(detailForm.id),
+                onToggleFavorite = { viewModel.toggleSupportFormFavorite(detailForm.id) },
+                onOpen = { viewModel.openUrl(context, detailForm.formUrl) },
+                onCopy = { viewModel.copyToClipboard(context, detailForm.formUrl, detailForm.formName) },
+                onShare = { viewModel.shareUrl(context, detailForm.formUrl, detailForm.formName) },
+                onLinkToCase = {
+                    selectedFormForCaseLink = detailForm
+                    selectedFormForDetails = null
+                },
+                onDismiss = { selectedFormForDetails = null }
+            )
         }
 
         // Link To Case BottomSheet
@@ -452,6 +523,9 @@ private fun SupportFormsHeader(totalCount: Int, verifiedCount: Int) {
 @Composable
 fun SupportFormCard(
     form: SupportFormEntity,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onClick: () -> Unit,
     onOpen: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
@@ -461,20 +535,23 @@ fun SupportFormCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
             .border(1.dp, CyberBorder, RoundedCornerShape(10.dp)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(10.dp)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            // Top Row: Company Badge & Verification - Using FlowRow to avoid overflows
-            FlowRow(
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Top Row: Company Badge, Problem Type Badge, Official Badge & Favorite
+            Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                FlowRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -503,30 +580,43 @@ fun SupportFormCard(
                             fontWeight = FontWeight.Medium
                         )
                     }
+
+                    if (form.verified) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(CyberSuccess.copy(alpha = 0.12f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Verified,
+                                contentDescription = "رسمي",
+                                tint = CyberSuccess,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = "رسمي",
+                                color = CyberSuccess,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
 
-                if (form.verified) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(CyberSuccess.copy(alpha = 0.12f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Verified,
-                            contentDescription = "رسمي",
-                            tint = CyberSuccess,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = "رابط رسمي مباشر",
-                            color = CyberSuccess,
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                // Favorite button (36dp with comfortable touch target)
+                IconButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = "المفضلة",
+                        tint = if (isFavorite) CyberWarning else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
 
@@ -542,15 +632,15 @@ fun SupportFormCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            // Direct URL
+            // Direct URL (Safe single-line pill)
             Spacer(modifier = Modifier.height(4.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                     .padding(horizontal = 7.dp, vertical = 3.dp)
             ) {
                 Icon(
@@ -560,7 +650,7 @@ fun SupportFormCard(
                     modifier = Modifier.size(12.dp)
                 )
                 Text(
-                    text = form.formUrl,
+                    text = form.officialDomain.ifBlank { form.formUrl },
                     fontSize = 10.sp,
                     color = CyberPrimaryLight,
                     maxLines = 1,
@@ -569,36 +659,7 @@ fun SupportFormCard(
                 )
             }
 
-            // Requirements / Guidance
-            if (form.notes.isNotBlank()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(CyberWarning.copy(alpha = 0.1f))
-                        .padding(horizontal = 7.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = CyberWarning,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Text(
-                        text = form.notes,
-                        fontSize = 10.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 14.sp,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Action Buttons Row - Compact & responsive
             Row(
@@ -634,6 +695,21 @@ fun SupportFormCard(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+
+                // Details Button
+                OutlinedButton(
+                    onClick = onClick,
+                    modifier = Modifier.height(34.dp),
+                    shape = RoundedCornerShape(7.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+                ) {
+                    Text(
+                        text = "التفاصيل",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 11.sp
+                    )
                 }
 
                 // Copy Action
@@ -681,6 +757,240 @@ fun SupportFormCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun SupportFormDetailSheet(
+    form: SupportFormEntity,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onOpen: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onLinkToCase: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Header: Badges and Close
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(CyberPrimary.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(text = form.company, color = CyberPrimaryLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(CyberSecondary.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(text = form.problemType, color = CyberSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    }
+                    if (form.verified) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(CyberSuccess.copy(alpha = 0.15f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Verified, contentDescription = null, tint = CyberSuccess, modifier = Modifier.size(13.dp))
+                            Text("رابط رسمي معتمد", color = CyberSuccess, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = "المفضلة",
+                            tint = if (isFavorite) CyberWarning else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Title
+            Text(
+                text = form.formName,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 24.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Category & Domain Details
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "التصنيف: ${form.category.ifBlank { "نماذج الدعم المباشرة" }}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "النطاق: ${form.officialDomain}",
+                    fontSize = 12.sp,
+                    color = CyberPrimaryLight,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Full URL Box with Copy
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Link, contentDescription = null, tint = CyberPrimaryLight, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = form.formUrl,
+                            fontSize = 11.5.sp,
+                            color = CyberPrimaryLight,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "نسخ", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+
+            // Notes / Requirements
+            if (form.notes.isNotBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = CyberWarning.copy(alpha = 0.08f)),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberWarning.copy(alpha = 0.25f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = CyberWarning, modifier = Modifier.size(16.dp))
+                            Text("إرشادات ومتطلبات التقديم", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = CyberWarning)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = form.notes,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Action Buttons
+            Button(
+                onClick = {
+                    onOpen()
+                    onDismiss()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("فتح النموذج في المتصفح الرسمي", fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        onDismiss()
+                        onLinkToCase()
+                    },
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberSecondary)
+                ) {
+                    Icon(Icons.Default.AddLink, contentDescription = null, tint = CyberSecondary, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("ربط بقضية", color = CyberSecondary, fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        onShare()
+                    },
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("مشاركة", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

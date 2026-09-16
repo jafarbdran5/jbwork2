@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.example.ui.components.CollapsibleHeaderContainer
+import com.example.ui.components.rememberScrollHeaderVisibility
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +57,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -135,7 +139,14 @@ fun InvestigationToolsScreen(
     val activeTab by viewModel.investigationActiveTab.collectAsStateWithLifecycle()
 
     var selectedToolForCaseLink by remember { mutableStateOf<InvestigationToolEntity?>(null) }
+    var selectedToolForDetails by remember { mutableStateOf<InvestigationToolEntity?>(null) }
     var showAddToolDialog by remember { mutableStateOf(false) }
+
+    val listState = rememberLazyListState()
+    val isHeaderVisible by rememberScrollHeaderVisibility(
+        listState = listState,
+        onVisibilityChanged = { viewModel.setGlobalTopBarVisible(it) }
+    )
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -156,147 +167,152 @@ fun InvestigationToolsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Header Banner
-            InvestigationToolsHeader(
-                totalCount = tools.size,
-                favoritesCount = tools.count { it.isFavorite }
-            )
+            // Dynamic Collapsible Header (Scroll Down -> Hide, Scroll Up -> Show)
+            CollapsibleHeaderContainer(visible = isHeaderVisible) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Header Banner
+                    InvestigationToolsHeader(
+                        totalCount = tools.size,
+                        favoritesCount = tools.count { it.isFavorite }
+                    )
 
-            // Tabs: All / Favorites / Recent
-            TabRow(
-                selectedTabIndex = activeTab,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = CyberPrimaryLight,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[activeTab]),
-                        color = CyberPrimaryLight
-                    )
-                }
-            ) {
-                Tab(
-                    selected = activeTab == 0,
-                    onClick = { viewModel.investigationActiveTab.value = 0 },
-                    text = { Text("جميع الأدوات", fontSize = 12.sp, fontWeight = if (activeTab == 0) FontWeight.Bold else FontWeight.Normal) }
-                )
-                Tab(
-                    selected = activeTab == 1,
-                    onClick = { viewModel.investigationActiveTab.value = 1 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = CyberWarning, modifier = Modifier.size(15.dp))
-                            Text("المفضلة", fontSize = 12.sp, fontWeight = if (activeTab == 1) FontWeight.Bold else FontWeight.Normal)
+                    // Tabs: All / Favorites / Recent
+                    TabRow(
+                        selectedTabIndex = activeTab,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = CyberPrimaryLight,
+                        indicator = { tabPositions ->
+                            TabRowDefaults.SecondaryIndicator(
+                                Modifier.tabIndicatorOffset(tabPositions[activeTab]),
+                                color = CyberPrimaryLight
+                            )
                         }
+                    ) {
+                        Tab(
+                            selected = activeTab == 0,
+                            onClick = { viewModel.investigationActiveTab.value = 0 },
+                            text = { Text("جميع الأدوات", fontSize = 12.sp, fontWeight = if (activeTab == 0) FontWeight.Bold else FontWeight.Normal) }
+                        )
+                        Tab(
+                            selected = activeTab == 1,
+                            onClick = { viewModel.investigationActiveTab.value = 1 },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Icon(Icons.Default.Star, contentDescription = null, tint = CyberWarning, modifier = Modifier.size(15.dp))
+                                    Text("المفضلة", fontSize = 12.sp, fontWeight = if (activeTab == 1) FontWeight.Bold else FontWeight.Normal)
+                                }
+                            }
+                        )
+                        Tab(
+                            selected = activeTab == 2,
+                            onClick = { viewModel.investigationActiveTab.value = 2 },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Icon(Icons.Default.History, contentDescription = null, tint = CyberSecondary, modifier = Modifier.size(15.dp))
+                                    Text("المستخدمة مؤخراً", fontSize = 12.sp, fontWeight = if (activeTab == 2) FontWeight.Bold else FontWeight.Normal)
+                                }
+                            }
+                        )
                     }
-                )
-                Tab(
-                    selected = activeTab == 2,
-                    onClick = { viewModel.investigationActiveTab.value = 2 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Default.History, contentDescription = null, tint = CyberSecondary, modifier = Modifier.size(15.dp))
-                            Text("المستخدمة مؤخراً", fontSize = 12.sp, fontWeight = if (activeTab == 2) FontWeight.Bold else FontWeight.Normal)
-                        }
-                    }
-                )
-            }
 
-            // Search Box
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.investigationSearchQuery.value = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .testTag("investigation_search_field"),
-                placeholder = {
-                    Text(
-                        "ابحث باسم الأداة، النطاق، فحص الروابط، الصور العكسية، التسريبات...",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "بحث",
-                        tint = CyberPrimaryLight
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { viewModel.investigationSearchQuery.value = "" }) {
+                    // Search Box
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.investigationSearchQuery.value = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .testTag("investigation_search_field"),
+                        placeholder = {
+                            Text(
+                                "ابحث باسم الأداة، النطاق، فحص الروابط، الصور العكسية، التسريبات...",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        },
+                        leadingIcon = {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "مسح",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "بحث",
+                                tint = CyberPrimaryLight
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotBlank()) {
+                                IconButton(onClick = { viewModel.investigationSearchQuery.value = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "مسح",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CyberPrimary,
+                            unfocusedBorderColor = CyberBorder,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                        )
+                    )
+
+                    // Categories Filter Scroll
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        TOOL_CATEGORIES.forEach { cat ->
+                            val isSelected = categoryFilter == cat
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.investigationCategoryFilter.value = cat },
+                                label = { Text(cat, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CyberPrimary.copy(alpha = 0.2f),
+                                    selectedLabelColor = CyberPrimaryLight,
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isSelected,
+                                    borderColor = if (isSelected) CyberPrimary else CyberBorder
+                                )
                             )
                         }
                     }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = CyberPrimary,
-                    unfocusedBorderColor = CyberBorder,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                )
-            )
 
-            // Categories Filter Scroll
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                TOOL_CATEGORIES.forEach { cat ->
-                    val isSelected = categoryFilter == cat
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.investigationCategoryFilter.value = cat },
-                        label = { Text(cat, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = CyberPrimary.copy(alpha = 0.2f),
-                            selectedLabelColor = CyberPrimaryLight,
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isSelected,
-                            borderColor = if (isSelected) CyberPrimary else CyberBorder
-                        )
-                    )
-                }
-            }
-
-            // Cost Filter Scroll
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                TOOL_COSTS.forEach { cost ->
-                    val isSelected = costFilter == cost
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.investigationCostFilter.value = cost },
-                        label = { Text(cost, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = CyberSecondary.copy(alpha = 0.2f),
-                            selectedLabelColor = CyberSecondary,
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isSelected,
-                            borderColor = if (isSelected) CyberSecondary else CyberBorder
-                        )
-                    )
+                    // Cost Filter Scroll
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        TOOL_COSTS.forEach { cost ->
+                            val isSelected = costFilter == cost
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.investigationCostFilter.value = cost },
+                                label = { Text(cost, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CyberSecondary.copy(alpha = 0.2f),
+                                    selectedLabelColor = CyberSecondary,
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isSelected,
+                                    borderColor = if (isSelected) CyberSecondary else CyberBorder
+                                )
+                            )
+                        }
+                    }
                 }
             }
 
@@ -333,6 +349,7 @@ fun InvestigationToolsScreen(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -340,6 +357,7 @@ fun InvestigationToolsScreen(
                     items(tools, key = { it.id }) { tool ->
                         InvestigationToolCard(
                             tool = tool,
+                            onClick = { selectedToolForDetails = tool },
                             onOpen = { viewModel.openUrl(context, tool.url, tool.id) },
                             onCopy = { viewModel.copyToClipboard(context, tool.url, tool.name) },
                             onShare = { viewModel.shareUrl(context, tool.url, "${tool.name} - أداة فحص رقمي") },
@@ -349,6 +367,23 @@ fun InvestigationToolsScreen(
                     }
                 }
             }
+        }
+
+        // Tool Details BottomSheet
+        if (selectedToolForDetails != null) {
+            val detailTool = selectedToolForDetails!!
+            InvestigationToolDetailSheet(
+                tool = detailTool,
+                onOpen = { viewModel.openUrl(context, detailTool.url, detailTool.id) },
+                onCopy = { viewModel.copyToClipboard(context, detailTool.url, detailTool.name) },
+                onShare = { viewModel.shareUrl(context, detailTool.url, "${detailTool.name} - أداة فحص رقمي") },
+                onToggleFavorite = { viewModel.toggleToolFavorite(detailTool.id, detailTool.isFavorite) },
+                onLinkToCase = {
+                    selectedToolForCaseLink = detailTool
+                    selectedToolForDetails = null
+                },
+                onDismiss = { selectedToolForDetails = null }
+            )
         }
 
         // Link Tool to Case BottomSheet
@@ -446,6 +481,7 @@ private fun InvestigationToolsHeader(totalCount: Int, favoritesCount: Int) {
 @Composable
 fun InvestigationToolCard(
     tool: InvestigationToolEntity,
+    onClick: () -> Unit,
     onOpen: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
@@ -456,28 +492,33 @@ fun InvestigationToolCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, CyberBorder, RoundedCornerShape(12.dp)),
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .border(1.dp, CyberBorder, RoundedCornerShape(10.dp)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(10.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             // Header Row: Category Badge + Cost + Favorite
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(CyberPrimary.copy(alpha = 0.15f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = tool.category,
                             color = CyberPrimaryLight,
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -489,9 +530,9 @@ fun InvestigationToolCard(
                     }
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(costColor.copy(alpha = 0.15f))
-                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = tool.freeOrPaid,
@@ -504,18 +545,18 @@ fun InvestigationToolCard(
 
                 IconButton(
                     onClick = onToggleFavorite,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         imageVector = if (tool.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
                         contentDescription = "المفضلة",
-                        tint = if (tool.isFavorite) CyberWarning else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
+                        tint = if (tool.isFavorite) CyberWarning else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Tool Title & Domain
             Row(
@@ -525,116 +566,98 @@ fun InvestigationToolCard(
             ) {
                 Text(
                     text = tool.name,
-                    fontSize = 16.sp,
+                    fontSize = 14.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+
+                Spacer(modifier = Modifier.width(6.dp))
 
                 Text(
                     text = tool.officialDomain,
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     color = CyberPrimaryLight,
                     fontWeight = FontWeight.Medium
                 )
             }
 
-            // Description
-            Spacer(modifier = Modifier.height(6.dp))
+            // Concise Description
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = tool.description,
-                fontSize = 12.sp,
+                fontSize = 11.5.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 17.sp
+                lineHeight = 16.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
 
-            // Privacy / OpSec Warning Note
-            if (tool.privacyRisk.isNotBlank() && tool.privacyRisk != "منخفض") {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(CyberWarning.copy(alpha = 0.1f))
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = null,
-                        tint = CyberWarning,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = "ملاحظة أمنية: مستوى مخاطر الخصوصية: ${tool.privacyRisk}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 15.sp
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Last used timestamp if available
-            if (tool.lastUsedAt != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                val formattedDate = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(tool.lastUsedAt))
-                Text(
-                    text = "آخر استخدام: $formattedDate",
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Action Buttons Row
+            // Action Buttons Row - Clean & responsive
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 // Primary Action: Open Official Tool in browser
                 Button(
                     onClick = onOpen,
                     modifier = Modifier
                         .weight(1f)
-                        .height(38.dp)
+                        .height(34.dp)
                         .testTag("open_tool_button_${tool.id}"),
                     colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp)
+                    shape = RoundedCornerShape(7.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.OpenInBrowser,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Text(
                             text = "تشغيل الأداة",
                             color = Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+
+                // Details Action
+                OutlinedButton(
+                    onClick = onClick,
+                    modifier = Modifier.height(34.dp),
+                    shape = RoundedCornerShape(7.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+                ) {
+                    Text(
+                        text = "التفاصيل",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 11.sp
+                    )
                 }
 
                 // Copy Action
                 IconButton(
                     onClick = onCopy,
                     modifier = Modifier
-                        .size(38.dp)
-                        .border(1.dp, CyberBorder, RoundedCornerShape(8.dp))
+                        .size(34.dp)
+                        .border(1.dp, CyberBorder, RoundedCornerShape(7.dp))
                 ) {
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
                         contentDescription = "نسخ الرابط",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                 }
 
@@ -642,14 +665,14 @@ fun InvestigationToolCard(
                 IconButton(
                     onClick = onShare,
                     modifier = Modifier
-                        .size(38.dp)
-                        .border(1.dp, CyberBorder, RoundedCornerShape(8.dp))
+                        .size(34.dp)
+                        .border(1.dp, CyberBorder, RoundedCornerShape(7.dp))
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
                         contentDescription = "مشاركة",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                 }
 
@@ -657,17 +680,279 @@ fun InvestigationToolCard(
                 IconButton(
                     onClick = onLinkToCase,
                     modifier = Modifier
-                        .size(38.dp)
-                        .border(1.dp, CyberSecondary.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .size(34.dp)
+                        .border(1.dp, CyberSecondary.copy(alpha = 0.5f), RoundedCornerShape(7.dp))
                 ) {
                     Icon(
                         imageVector = Icons.Default.AddLink,
                         contentDescription = "ربط بقضية",
                         tint = CyberSecondary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun InvestigationToolDetailSheet(
+    tool: InvestigationToolEntity,
+    onOpen: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onLinkToCase: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Header Row: Badges, Favorite & Close
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(CyberPrimary.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(text = tool.category, color = CyberPrimaryLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    val costColor = when (tool.freeOrPaid) {
+                        "مجاني" -> CyberSuccess
+                        "مجاني جزئياً" -> CyberWarning
+                        else -> CyberDanger
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(costColor.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(text = tool.freeOrPaid, color = costColor, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            imageVector = if (tool.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = "المفضلة",
+                            tint = if (tool.isFavorite) CyberWarning else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Tool Name
+            Text(
+                text = tool.name,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Domain Info
+            Text(
+                text = "النطاق الرسمي: ${tool.officialDomain}",
+                fontSize = 12.sp,
+                color = CyberPrimaryLight,
+                fontWeight = FontWeight.Medium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Full URL Box with Copy
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Link, contentDescription = null, tint = CyberPrimaryLight, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = tool.url,
+                            fontSize = 11.5.sp,
+                            color = CyberPrimaryLight,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "نسخ", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Full Description
+            Text(
+                text = "عن الأداة واستخداماتها:",
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.5.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = tool.description,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // Privacy / OpSec Warning Card
+            if (tool.privacyRisk.isNotBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (tool.privacyRisk == "منخفض") CyberSuccess.copy(alpha = 0.08f) else CyberWarning.copy(alpha = 0.08f)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (tool.privacyRisk == "منخفض") CyberSuccess.copy(alpha = 0.25f) else CyberWarning.copy(alpha = 0.25f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Security,
+                                contentDescription = null,
+                                tint = if (tool.privacyRisk == "منخفض") CyberSuccess else CyberWarning,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "مستوى أمان الخصوصية (OpSec): ${tool.privacyRisk}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = if (tool.privacyRisk == "منخفض") CyberSuccess else CyberWarning
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (tool.privacyRisk == "منخفض") {
+                                "هذه الأداة آمنة ولا تشارك بيانات الاستعلام بشكل علني، ولا تتطلب تسريب هوية المحقق."
+                            } else {
+                                "تنبيه أمني: قد تحتفظ هذه الأداة بسجلات الاستعلامات أو قد يتم إشعار صاحب الهدف. احرص على استخدام بروكسي أو عدم إدخال بيانات حساسة مباشرة."
+                            },
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            // Last used timestamp if available
+            if (tool.lastUsedAt != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                val formattedDate = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(tool.lastUsedAt))
+                Text(
+                    text = "آخر استخدام مسجل: $formattedDate",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Big Action Button: Open
+            Button(
+                onClick = {
+                    onOpen()
+                    onDismiss()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("تشغيل الأداة في المتصفح الرسمي", fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Secondary Action Row: Link & Share
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        onDismiss()
+                        onLinkToCase()
+                    },
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberSecondary)
+                ) {
+                    Icon(Icons.Default.AddLink, contentDescription = null, tint = CyberSecondary, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("ربط بقضية", color = CyberSecondary, fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        onShare()
+                    },
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberBorder)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("مشاركة", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
